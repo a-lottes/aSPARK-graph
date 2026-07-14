@@ -42,10 +42,16 @@ def story_trace(story: str, feature: str | None = None, repo: str = ".") -> dict
 
 
 @mcp.tool
-def impact(files: list[str], repo: str = ".") -> dict:
-    """Blast radius of changing the given files: the stories and acceptance
-    criteria that depend on them, each tagged with its weakest-edge confidence."""
-    return queries.impact(queries.load_graph(repo), files)
+def impact(files: list[str] | None = None, diff: str | None = None, repo: str = ".") -> dict:
+    """Blast radius of a change: the stories and acceptance criteria that depend
+    on the given files (or the files in a git `diff` range), each tagged with its
+    weakest-edge confidence. Pass either `files` or `diff`, not both."""
+    graph = queries.load_graph(repo)
+    if diff:
+        if files:
+            return {"found": False, "reason": "bad_args", "message": "pass either files or diff, not both"}
+        return queries.impact_diff(graph, repo, diff)
+    return queries.impact(graph, files or [])
 
 
 @mcp.tool

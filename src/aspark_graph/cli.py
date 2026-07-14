@@ -74,10 +74,19 @@ def _handle_story_trace(graph, args) -> dict:
 
 
 def _args_impact(qp: argparse.ArgumentParser) -> None:
-    qp.add_argument("files", nargs="+", help="One or more changed file paths")
+    qp.add_argument("files", nargs="*", help="One or more changed file paths")
+    qp.add_argument("--diff", default=None, metavar="RANGE",
+                    help="A git range (e.g. HEAD~2..HEAD) to derive the files from")
 
 
 def _handle_impact(graph, args) -> dict:
+    if args.diff:
+        if args.files:
+            return {"found": False, "reason": "bad_args",
+                    "message": "pass either files or --diff, not both"}
+        return queries.impact_diff(graph, args.repo, args.diff)
+    if not args.files:
+        return {"found": False, "reason": "bad_args", "message": "no files given (pass files or --diff)"}
     return queries.impact(graph, args.files)
 
 

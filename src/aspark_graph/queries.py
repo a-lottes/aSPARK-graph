@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from . import git
 from .graph import Graph, default_graph_path
 from .model import Confidence, EdgeType, NodeType, feature_id, file_id
 
@@ -197,6 +198,20 @@ def impact(graph: Graph, files: list[str]) -> dict:
         "affected_stories": _confidence_list(graph, agg_stories, "story"),
         "affected_acs": _confidence_list(graph, agg_acs, "ac"),
     }
+
+
+def impact_diff(graph: Graph, repo_root: str | Path, diff_range: str) -> dict:
+    """Blast radius of a git change range: resolve the range to a file list and
+    feed the existing `impact` engine (so the answer equals passing the files
+    explicitly — AC-3.1)."""
+    files, err = git.diff_files(repo_root, diff_range)
+    if err is not None:
+        return {"found": False, "reason": "bad_range", "range": diff_range, "message": err}
+    result = impact(graph, files)
+    result["range"] = diff_range
+    if not files:
+        result["note"] = "no files in range"
+    return result
 
 
 def _confidence_list(graph: Graph, ranked: dict[str, int], key_attr: str) -> list[dict]:
