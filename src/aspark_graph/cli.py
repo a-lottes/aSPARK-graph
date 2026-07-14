@@ -117,11 +117,20 @@ def _handle_gate_health(graph, args) -> dict:
     return queries.gate_health(graph, args.feature)
 
 
+def _args_staleness(qp: argparse.ArgumentParser) -> None:
+    pass  # --repo (added for every query) is all it needs
+
+
+def _handle_staleness(graph, args) -> dict:
+    return queries.staleness(graph, args.repo)
+
+
 _QUERY_ARGS = {
     "get_node": _args_get_node,
     "story_trace": _args_story_trace,
     "impact": _args_impact,
     "gate_health": _args_gate_health,
+    "staleness": _args_staleness,
     "find_nodes": _args_find_nodes,
     "get_neighbors": _args_get_neighbors,
     "shortest_path": _args_shortest_path,
@@ -131,6 +140,7 @@ _QUERY_HANDLERS = {
     "story_trace": _handle_story_trace,
     "impact": _handle_impact,
     "gate_health": _handle_gate_health,
+    "staleness": _handle_staleness,
     "find_nodes": _handle_find_nodes,
     "get_neighbors": _handle_get_neighbors,
     "shortest_path": _handle_shortest_path,

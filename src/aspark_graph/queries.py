@@ -10,6 +10,7 @@ dict, so serialisation is identical across both adapters.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from .graph import Graph, default_graph_path
@@ -215,6 +216,33 @@ def _normalise_path(raw: str) -> str:
     if p.startswith("./"):
         p = p[2:]
     return p
+
+
+# --- staleness (US-4) ------------------------------------------------------
+
+def staleness(graph: Graph, repo_root: str | Path) -> dict:
+    """Compare each File node's stored hash to the file on disk, so a consumer
+    never acts on an answer from a graph that no longer matches the repo."""
+    root = Path(repo_root)
+    changed, missing = [], []
+    file_nodes = graph.nodes(NodeType.FILE)
+    for node in file_nodes:
+        rel = node["id"][len("file:"):]
+        path = root / rel
+        if not path.exists():
+            missing.append(rel)
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+        if digest != node.get("hash"):
+            changed.append(rel)
+    stale = bool(changed or missing)
+    return {
+        "stale": stale,
+        "files_checked": len(file_nodes),
+        "changed": sorted(changed),
+        "missing": sorted(missing),
+        "advice": "Run 'aspark-graph build' to refresh the graph." if stale else None,
+    }
 
 
 # --- gate health (US-6) ----------------------------------------------------

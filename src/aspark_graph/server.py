@@ -56,6 +56,12 @@ def gate_health(feature: str, repo: str = ".") -> dict:
 
 
 @mcp.tool
+def staleness(repo: str = ".") -> dict:
+    """Report whether the built graph still matches the repo on disk (US-4)."""
+    return queries.staleness(queries.load_graph(repo), repo)
+
+
+@mcp.tool
 def find_nodes(query: str, type: str | None = None, repo: str = ".") -> dict:
     """Find nodes whose id or name contains a substring, optionally by type."""
     return queries.find_nodes(queries.load_graph(repo), query, type)
