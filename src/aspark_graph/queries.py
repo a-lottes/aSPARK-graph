@@ -137,6 +137,7 @@ def _reach(graph: Graph, seed: str) -> dict[str, int]:
     """Widest-path (max-bottleneck) reachability: best[node] is the strongest
     weakest-edge confidence over all paths from ``seed``."""
     inf = max(_RANK_CONF) + 1
+    unseen = min(_RANK_CONF) - 1  # sentinel below every real rank (inferred=0)
     best = {seed: inf}
     queue = [seed]
     while queue:
@@ -144,7 +145,7 @@ def _reach(graph: Graph, seed: str) -> dict[str, int]:
         base = best[node]
         for nbr, erank in _impact_steps(graph, node):
             cand = min(base, erank)
-            if cand > best.get(nbr, 0):
+            if cand > best.get(nbr, unseen):
                 best[nbr] = cand
                 queue.append(nbr)
     return best

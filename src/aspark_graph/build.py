@@ -11,7 +11,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from . import artifacts, extractors
+from . import artifacts, extractors, inference
 from .extractors.base import FileExtraction, language_for
 from .graph import Graph
 from .model import (
@@ -36,10 +36,13 @@ _PY_SOURCE_ROOTS = ("src/", "lib/")
 class BuildReport:
     code_entities: int = 0
     artifact_entities: int = 0
+    inferred_edges: int = 0
     unparsed: list[str] = field(default_factory=list)
 
     def summary(self) -> str:
         line = f"{self.code_entities} code entities, {self.artifact_entities} artifact entities"
+        if self.inferred_edges:
+            line += f", {self.inferred_edges} inferred link(s)"
         if self.unparsed:
             line += f", {len(self.unparsed)} file(s) unparsed"
         return line
@@ -73,6 +76,10 @@ def build_graph(repo_root: str | Path) -> tuple[Graph, BuildReport]:
 
     report.code_entities = graph.counts()["code"]
     report.artifact_entities = artifacts.extract_features(repo_root, graph)
+    # Best-effort inferred implements edges from git history (declared edges from
+    # files: notes are already in place and are never overwritten). No-op if git
+    # is unavailable (AC-1.6).
+    report.inferred_edges = inference.infer_implements(graph, repo_root)
     return graph, report
 
 
