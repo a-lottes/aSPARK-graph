@@ -66,3 +66,9 @@ def test_save_is_byte_stable_regardless_of_insertion_order(tmp_path):
 
 def test_confidence_rank_orders_weakest_first():
     assert Confidence.EXTRACTED.rank() < Confidence.DECLARED.rank()
+
+
+def test_confidence_inferred_is_weakest_tier():
+    # T1: inferred ranks below extracted and declared.
+    assert Confidence.INFERRED.rank() == 0
+    assert Confidence.INFERRED.rank() < Confidence.EXTRACTED.rank() < Confidence.DECLARED.rank()

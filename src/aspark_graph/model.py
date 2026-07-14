@@ -40,14 +40,15 @@ class EdgeType(str, Enum):
 
 
 class Confidence(str, Enum):
-    """Where an edge came from. No ``inferred`` tier until there is inference."""
+    """Where an edge came from."""
 
+    INFERRED = "inferred"    # self-derived (e.g. from git history) — weakest
     EXTRACTED = "extracted"  # deterministic, from tree-sitter
     DECLARED = "declared"    # from an aSPARK artifact
 
     def rank(self) -> int:
         """Higher = stronger. Used to pick the *weakest* edge on a path."""
-        return {Confidence.EXTRACTED: 1, Confidence.DECLARED: 2}[self]
+        return {Confidence.INFERRED: 0, Confidence.EXTRACTED: 1, Confidence.DECLARED: 2}[self]
 
 
 # --- Id schemes ------------------------------------------------------------
