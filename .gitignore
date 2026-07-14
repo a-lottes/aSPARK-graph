@@ -1,0 +1,17 @@
+# aspark-graph read model (disposable, rebuildable)
+.aspark-graph/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+build/
+dist/
+
+# uv
+uv.lock merge=binary
+
+# macOS
+.DS_Store

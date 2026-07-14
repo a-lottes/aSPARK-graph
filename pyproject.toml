@@ -1,0 +1,39 @@
+[project]
+name = "aspark-graph"
+version = "0.1.0"
+description = "A lean, local code-and-artifact knowledge graph that speaks SPARK."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Andreas Lottes" }]
+keywords = ["mcp", "knowledge-graph", "aspark", "tree-sitter", "code-graph"]
+
+# The tree-sitter core + grammars are pinned EXACTLY: a grammar version bump can
+# change node types and thus the extracted graph, which would break the
+# byte-stable-rebuild guarantee (AC-1.2). fastmcp/networkx do not affect the
+# serialised graph (persistence is canonicalised in-house), so a floor + the
+# committed uv.lock is the determinism contract for those.
+dependencies = [
+    "fastmcp>=2.0",
+    "networkx>=3.2",
+    "tree-sitter==0.26.0",
+    "tree-sitter-python==0.25.0",
+    "tree-sitter-typescript==0.23.2",
+    "tree-sitter-java==0.23.5",
+]
+
+[project.scripts]
+aspark-graph = "aspark_graph.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aspark_graph"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
