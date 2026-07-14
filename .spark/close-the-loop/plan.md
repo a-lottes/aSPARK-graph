@@ -288,8 +288,10 @@ guardrails**, not soft goals.
   `inferred` (weakest) tier. It breaks no AC — the correct story is always among the
   results, and the spurious one is exactly the tolerated inferred false positive
   A4/AC-1.4 anticipate (weak tier + human confirmation). Recorded as a precision
-  limitation; a deterministic fix (feature-qualified ids in commits, e.g.
-  `close-the-loop/T3`) is a Tier-1/next-cycle candidate, not retrofitted here.
+  limitation. **Superseded by the review fix F1:** `inference.py` now
+  disambiguates via semantic (task→story) pairing plus a `.spark/<feature>/`
+  co-touch tie-break, so cross-feature over-attribution is eliminated on the real
+  repo (aspark-graph-sourced `implements` edges: 8 → 0). See review-report F1.
 - **D3 — per-task id-referencing commits (the load-bearing convention).** As planned,
   each task was committed with `T<n>: … (US-<m>)`; this made the repo self-hosting so
   `impact(src/aspark_graph/inference.py)` returns `US-1` (inferred) on the real repo —

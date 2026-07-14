@@ -46,8 +46,8 @@ Add it to Claude Code as an MCP server, pointing at your checkout:
 claude mcp add aspark-graph -- uv run --directory /path/to/aspark-graph aspark-graph serve
 ```
 
-> Once aspark-graph is published, a `uvx`-based one-liner will be documented
-> here. Until then, the from-source path above is the supported install.
+Until aspark-graph is published to a package index, the from-source path above
+is the supported install.
 
 ## Usage
 
