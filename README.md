@@ -66,7 +66,9 @@ MCP server isn't running in the session. Output is JSON.
 ```bash
 aspark-graph query story_trace US-2 --feature my-feature
 aspark-graph query impact src/foo.py src/bar.py
+aspark-graph query impact --diff HEAD~1..HEAD      # blast radius of a change range
 aspark-graph query gate_health my-feature
+aspark-graph query staleness                       # does the graph still match the repo?
 aspark-graph query get_node "file:src/foo.py"
 aspark-graph query find_nodes Widget --type Class
 aspark-graph query get_neighbors "story:my-feature:US-1" --edge-type has_ac
@@ -76,8 +78,28 @@ aspark-graph query shortest_path "task:my-feature:T1" "ac:my-feature:AC-1.1"
 ### Query (MCP)
 
 The same operations are exposed as MCP tools (`build_graph`, `story_trace`,
-`impact`, `gate_health`, `get_node`, `find_nodes`, `get_neighbors`,
+`impact`, `gate_health`, `staleness`, `get_node`, `find_nodes`, `get_neighbors`,
 `shortest_path`) — the CLI and MCP return identical answers by construction.
+
+## Linking code to stories
+
+`impact` and `story_trace` are only as useful as the `implements` (task→code)
+links they can find. aspark-graph establishes those links in three ways, from
+strongest to weakest confidence:
+
+| Confidence | Source | How to opt in |
+|---|---|---|
+| `declared` | An explicit `files:` note on a plan task | In `plan.md`, add `files: <path>` to a task's *Definition of Done* cell, e.g. `… ; files: src/foo.py`. The link is created only if the file exists (a dangling path is ignored, never fabricated). |
+| `inferred` | Git commit history | Reference the task id **and** its story id in the commit message — subject `T3: add parser (US-1)` or a `Refs: T3, US-1` trailer. Any file touched by that commit is linked to the task at `inferred` confidence. |
+| `extracted` | tree-sitter (`contains`/`imports`) | Automatic — no action needed. |
+
+**Recommendation for aSPARK repos:** make one commit per task whose message
+names the task and story ids (the same convention aSPARK's own workflow already
+encourages). That alone lets `impact` answer on a repo that was never
+hand-annotated. `impact` always tags each result with the weakest link on its
+path, so you can tell an `inferred` blast-radius hit from a `declared` one.
+Inference is deterministic (it reads only committed state, never timestamps) and
+offline; if git is unavailable it is simply skipped.
 
 ## Supported languages
 
