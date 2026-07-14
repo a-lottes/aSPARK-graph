@@ -52,6 +52,12 @@ def init_git_repo(root):
 
 
 @pytest.fixture
+def git_tools():
+    """Expose the git fixture helpers to tests that build their own repo."""
+    return {"init": init_git_repo, "commit": git_commit}
+
+
+@pytest.fixture
 def git_backed_repo(tmp_path):
     """A git repo with a .spark trail and an id-referencing commit that links
     code to a task (the realistic history inference reads)."""
