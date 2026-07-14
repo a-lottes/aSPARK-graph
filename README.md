@@ -29,22 +29,25 @@ the two don't conflict.
 
 ## Install
 
-Requires Python ≥ 3.11. With [uv](https://docs.astral.sh/uv/):
+Requires Python ≥ 3.11 and [uv](https://docs.astral.sh/uv/). aspark-graph is not
+yet published to a package index, so install it from a checkout of this
+repository:
 
 ```bash
-# Run without installing
-uvx aspark-graph build .
-
-# Or add as an MCP server to Claude Code
-claude mcp add aspark-graph -- uvx aspark-graph serve
+git clone <this-repo-url> aspark-graph
+cd aspark-graph
+uv sync                       # installs into a local .venv
+uv run aspark-graph build .   # build the graph for the current repo
 ```
 
-From source:
+Add it to Claude Code as an MCP server, pointing at your checkout:
 
 ```bash
-uv sync
-uv run aspark-graph build .
+claude mcp add aspark-graph -- uv run --directory /path/to/aspark-graph aspark-graph serve
 ```
+
+> Once aspark-graph is published, a `uvx`-based one-liner will be documented
+> here. Until then, the from-source path above is the supported install.
 
 ## Usage
 
