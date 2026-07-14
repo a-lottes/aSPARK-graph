@@ -23,22 +23,35 @@ def build_graph(path: str = ".") -> dict:
     return {
         "code_entities": report.code_entities,
         "artifact_entities": report.artifact_entities,
+        "inferred_edges": report.inferred_edges,
         "unparsed": report.unparsed,
         "graph_path": str(out_path),
     }
 
 
+def _open(repo: str):
+    """Load the graph, or return a clean 'build first' error dict — parity with
+    the CLI's AC-5.2 message so a query-before-build never raises a raw error to
+    the MCP client (F3). Returns (graph, None) or (None, error_dict)."""
+    try:
+        return queries.load_graph(repo), None
+    except queries.GraphNotBuiltError as exc:
+        return None, {"found": False, "error": str(exc)}
+
+
 @mcp.tool
 def get_node(id: str, repo: str = ".") -> dict:
     """Look up a single node by its id (e.g. 'file:src/foo.py')."""
-    return queries.get_node(queries.load_graph(repo), id)
+    graph, err = _open(repo)
+    return err or queries.get_node(graph, id)
 
 
 @mcp.tool
 def story_trace(story: str, feature: str | None = None, repo: str = ".") -> dict:
     """Full thread of a user story: acceptance criteria (with their latest QA
     verdict), mapped plan tasks, and any best-effort code links."""
-    return queries.story_trace(queries.load_graph(repo), story, feature)
+    graph, err = _open(repo)
+    return err or queries.story_trace(graph, story, feature)
 
 
 @mcp.tool
@@ -46,7 +59,9 @@ def impact(files: list[str] | None = None, diff: str | None = None, repo: str = 
     """Blast radius of a change: the stories and acceptance criteria that depend
     on the given files (or the files in a git `diff` range), each tagged with its
     weakest-edge confidence. Pass either `files` or `diff`, not both."""
-    graph = queries.load_graph(repo)
+    graph, err = _open(repo)
+    if err:
+        return err
     if diff:
         if files:
             return {"found": False, "reason": "bad_args", "message": "pass either files or diff, not both"}
@@ -58,31 +73,36 @@ def impact(files: list[str] | None = None, diff: str | None = None, repo: str = 
 def gate_health(feature: str, repo: str = ".") -> dict:
     """The aSPARK gate invariants as data: orphan tasks, unverified acceptance
     criteria, and open findings for a feature."""
-    return queries.gate_health(queries.load_graph(repo), feature)
+    graph, err = _open(repo)
+    return err or queries.gate_health(graph, feature)
 
 
 @mcp.tool
 def staleness(repo: str = ".") -> dict:
     """Report whether the built graph still matches the repo on disk (US-4)."""
-    return queries.staleness(queries.load_graph(repo), repo)
+    graph, err = _open(repo)
+    return err or queries.staleness(graph, repo)
 
 
 @mcp.tool
 def find_nodes(query: str, type: str | None = None, repo: str = ".") -> dict:
     """Find nodes whose id or name contains a substring, optionally by type."""
-    return queries.find_nodes(queries.load_graph(repo), query, type)
+    graph, err = _open(repo)
+    return err or queries.find_nodes(graph, query, type)
 
 
 @mcp.tool
 def get_neighbors(id: str, edge_types: list[str] | None = None, depth: int = 1, repo: str = ".") -> dict:
     """Nodes within `depth` hops of a node (both directions); 'what touches this?'."""
-    return queries.get_neighbors(queries.load_graph(repo), id, edge_types, depth)
+    graph, err = _open(repo)
+    return err or queries.get_neighbors(graph, id, edge_types, depth)
 
 
 @mcp.tool
 def shortest_path(a: str, b: str, repo: str = ".") -> dict:
     """An ordered path connecting two nodes, or an explicit 'no path' result."""
-    return queries.shortest_path(queries.load_graph(repo), a, b)
+    graph, err = _open(repo)
+    return err or queries.shortest_path(graph, a, b)
 
 
 def run() -> None:
