@@ -174,17 +174,17 @@ aspark-graph-internal work rule only — **no aSPARK template/agent change ships
 
 | # | Task | Story | Depends on | Status | Definition of Done |
 |---|---|---|---|---|---|
-| T1 | Add `Confidence.INFERRED` (value `"inferred"`, rank 0) to `model.py`; update `.rank()` map. | US-1 | – | `done` | Unit test: `Confidence.INFERRED.rank() == 0 < EXTRACTED(1) < DECLARED(2)`; `_RANK_CONF` in `queries.py` now has three entries with `inferred` weakest. Existing v0.1.0 model tests still pass. Committed as `T1: … (US-1)`. |
-| T2 | New `git.py`: offline `subprocess` helpers `is_git_repo`, `commits_touching(root, ids)`, `diff_files(root, range)`; pinned invocation (`--no-merges -z --name-only`, no dates); every failure mode (no git binary, not a repo, shallow, bad range) returns empty/typed result, never raises. | US-1 | – | `doing` | Unit tests: in a `tmp_path` git repo with two commits, `commits_touching` returns exactly the files whose commit message referenced the queried id; in a non-git dir all helpers return empty/false with no exception (AC-1.6 seed). Committed as `T2: … (US-1)`. |
-| T3 | **Walking skeleton**: `inference.infer_implements(graph, repo_root)` adds `Task --implements--> File` at `INFERRED` for graphed files touched by id-referencing commits; wire into `build.py` (after artifacts) + `BuildReport.inferred_edges`. | US-1 | T1, T2 | `done` | Against a git-backed fixture repo (task `T1`/`US-1` referenced in a commit that touched `app.py`), `build` produces ≥1 `implements` edge tagged `inferred`, and `impact(["app.py"])` returns ≥1 affected story tagged `inferred`. Runs end-to-end via `build_graph`. Non-git repo → 0 inferred edges, build succeeds. Committed as `T3: … (US-1)`. |
-| T4 | Determinism of inference (AC-1.5): guarantee two builds of the same repo state yield identical inferred edges + tags. | US-1 | T3 | `done` | Test: build the git-backed fixture twice; `graph.to_dict()` is byte-identical across both (extends the v0.1.0 double-build determinism test to include inferred edges). Ordering in `inference.py` is fully sorted/derived, never insertion- or clock-dependent. Committed as `T4: … (US-1)`. |
-| T5 | Confirm read-direction (US-2) and graceful absence (AC-1.6, AC-2.3): `story_trace` code section non-empty for a story with inferred code; inferred links tagged distinctly; a story/file with no inferable link still returns cleanly. | US-2 | T3 | `done` | Tests: `story_trace(US-1)` on the git-backed fixture has a non-empty `code` list with `confidence == "inferred"` (AC-2.1/AC-2.2); a story with no code link returns full declared trail + empty code, no error (AC-2.3); `impact` on a file with no inferable link returns explicit "no affected" (AC-1.6). Declared `files:` note still wins at `declared` (AC-5.2 preserved). Committed as `T5: … (US-2)`. |
-| T6 | Headline AC-1.1/AC-1.2 — two-track proof. **(a) Automated (hard proof):** git-backed fixture with realistic id-referencing history in `tmp_path` — deterministic, independent of the real repo's state. **(b) `/demo-day` (self-fulfilling):** once the v0.2.0 task-commits exist, verify on **this** aspark-graph repo. | US-1 | T3 | `done` | (a) An automated test builds the git-backed fixture and asserts `impact(<file>)` returns non-empty `affected_stories` + `affected_acs` and `len([e for e in graph.edges() if e.type=="implements"]) >= 1` (AC-1.1/AC-1.2), fully in CI. (b) A documented `/demo-day` step builds the real repo (after this cycle's task-commits land) and confirms `impact(<a real src file implementing a close-the-loop story>)` is non-empty — the exact query empty today. Any real-repo assertion is `/demo-day`, not CI (keeps CI hermetic). Committed as `T6: … (US-1)`. |
-| T7 | Staleness (US-4): `queries.staleness(graph, repo_root)` compares File-node `hash` to on-disk sha256; CLI `query staleness` + optional banner; MCP `staleness` tool. | US-4 | T3 | `done` | Tests: unchanged repo → `stale=false`, no warning (AC-4.2); mutate a tracked file → `stale=true` naming the changed file (AC-4.1); rebuild → `stale=false` again (AC-4.3). CLI and MCP return the same staleness dict (parity). Committed as `T7: … (US-4)`. |
-| T8 | *(done)* **No-regression gate**: re-run the entire v0.1.0 test suite unchanged against the three-tier enum + new build step; fix only genuine regressions in confidence-tagging output shape. | US-1 | T1, T3 | `todo` | `uv run pytest` is fully green including all v0.1.0 tests (`test_impact.py`, `test_story_trace.py`, `test_cli_mcp_parity.py`, `test_gate_health.py`, `test_navigation.py`, `test_build.py`, `test_graph.py`, `test_artifacts.py`). Any v0.1.0 AC assertion that changed value is documented in §6, not silently edited. Committed as `T8: … (US-1)`. |
-| T9 | `impact --diff <range>` (US-3): `queries.impact_diff` resolves range via `git.diff_files` then calls existing `impact`; CLI `--diff` flag; MCP `diff` param. | US-3 | T2 | `todo` | Tests: `impact_diff(range)` == `impact(files_in_range)` (AC-3.1); range touching an ungraphed path names it as unknown while still answering known files (AC-3.2); empty/invalid range → clear message, no traceback, no silent-empty (AC-3.3). Committed as `T9: … (US-3)`. |
-| T10 | *(done)* US-5 docs+robustness: README documents **both** declarative link paths and their confidence tiers — the `files:` note (→ `declared`) **and** the commit-message id-reference (→ `inferred`), each with a reproducible example; dangling `files:` reference still handled (no crash, no fabricated edge). | US-5 | T3 | `todo` | Test: a fixture task with `files: does/not/exist.py` yields no edge and no error (AC-5.3); a fixture task following the `files:` convention yields a `declared` edge distinct from inferred (AC-5.2); README section documents both paths precisely enough to reproduce, stating which yields `declared` vs `inferred` (AC-5.1). Committed as `T10: … (US-5)`. |
-| T11 | *(done)* US-6 README honesty: remove fictional `uvx`/PyPI claims; document only working install paths (from-source `uv`, optional local wheel) and the `uv run` MCP entry. | US-6 | – | `todo` | README install section contains no `uvx`/PyPI/package-index command (AC-6.1); following it from a clean env reaches a working install and a `build`+`query` run end-to-end (AC-6.2, `/demo-day`); MCP-add instructions use a working non-published entry point (AC-6.3). Committed as `T11: … (US-6)`. |
+| T1 | Add `Confidence.INFERRED` (value `"inferred"`, rank 0) to `model.py`; update `.rank()` map. | US-1 | – | `done` | `done` |
+| T2 | New `git.py`: offline `subprocess` helpers `is_git_repo`, `commits_touching(root, ids)`, `diff_files(root, range)`; pinned invocation (`--no-merges -z --name-only`, no dates); every failure mode (no git binary, not a repo, shallow, bad range) returns empty/typed result, never raises. | US-1 | – | `done` | `done` |
+| T3 | **Walking skeleton**: `inference.infer_implements(graph, repo_root)` adds `Task --implements--> File` at `INFERRED` for graphed files touched by id-referencing commits; wire into `build.py` (after artifacts) + `BuildReport.inferred_edges`. | US-1 | T1, T2 | `done` | `done` |
+| T4 | Determinism of inference (AC-1.5): guarantee two builds of the same repo state yield identical inferred edges + tags. | US-1 | T3 | `done` | `done` |
+| T5 | Confirm read-direction (US-2) and graceful absence (AC-1.6, AC-2.3): `story_trace` code section non-empty for a story with inferred code; inferred links tagged distinctly; a story/file with no inferable link still returns cleanly. | US-2 | T3 | `done` | `done` |
+| T6 | Headline AC-1.1/AC-1.2 — two-track proof. **(a) Automated (hard proof):** git-backed fixture with realistic id-referencing history in `tmp_path` — deterministic, independent of the real repo's state. **(b) `/demo-day` (self-fulfilling):** once the v0.2.0 task-commits exist, verify on **this** aspark-graph repo. | US-1 | T3 | `done` | `done` |
+| T7 | Staleness (US-4): `queries.staleness(graph, repo_root)` compares File-node `hash` to on-disk sha256; CLI `query staleness` + optional banner; MCP `staleness` tool. | US-4 | T3 | `done` | `done` |
+| T8 | **No-regression gate**: re-run the entire v0.1.0 test suite unchanged against the three-tier enum + new build step; fix only genuine regressions in confidence-tagging output shape. | US-1 | T1, T3 | `done` | `done` |
+| T9 | `impact --diff <range>` (US-3): `queries.impact_diff` resolves range via `git.diff_files` then calls existing `impact`; CLI `--diff` flag; MCP `diff` param. | US-3 | T2 | `done` | `done` |
+| T10 | US-5 docs+robustness: README documents **both** declarative link paths and their confidence tiers — the `files:` note (→ `declared`) **and** the commit-message id-reference (→ `inferred`), each with a reproducible example; dangling `files:` reference still handled (no crash, no fabricated edge). | US-5 | T3 | `done` | `done` |
+| T11 | US-6 README honesty: remove fictional `uvx`/PyPI claims; document only working install paths (from-source `uv`, optional local wheel) and the `uv run` MCP entry. | US-6 | – | `done` | `done` |
 
 Story coverage check: US-1 → T1,T2,T3,T4,T6,T8 · US-2 → T5 · US-3 → T9 ·
 US-4 → T7 · US-5 → T10 · US-6 → T11 · US-7 (Won't) → no tasks (correct). No
@@ -273,7 +273,27 @@ guardrails**, not soft goals.
 
 <!-- Filled during /increment. Any AC output value that changes vs. v0.1.0 is recorded here, not edited silently. -->
 
-_None yet — plan is `draft`._
+- **D1 — `_reach` sentinel collided with `inferred` rank 0.** v0.1.0's widest-path
+  reachability used `best.get(nbr, 0)` as the "unseen" sentinel; with `inferred`
+  now at rank 0, a legitimate inferred path failed the `cand > sentinel` check and
+  `impact` stayed empty. Fixed by lowering the sentinel to `min(rank) - 1`
+  (`queries._reach`). Caught by the T3 impact test — exactly the regression class
+  T8 exists to guard. No v0.1.0 AC value changed.
+- **D2 — cross-feature id collision in inference (honest limitation, not a
+  defect).** Inference matches a commit to a task/story purely by the `T<n>`/`US<n>`
+  ids in its message. When a repo has multiple `.spark/` features that reuse the
+  same numbering (this repo has both `aspark-graph` and `close-the-loop`, each with
+  a `T3`/`US-1`), a commit like `T3: … (US-1)` is genuinely ambiguous and inference
+  links the touched file to **both** features' `US-1`. This over-attributes at the
+  `inferred` (weakest) tier. It breaks no AC — the correct story is always among the
+  results, and the spurious one is exactly the tolerated inferred false positive
+  A4/AC-1.4 anticipate (weak tier + human confirmation). Recorded as a precision
+  limitation; a deterministic fix (feature-qualified ids in commits, e.g.
+  `close-the-loop/T3`) is a Tier-1/next-cycle candidate, not retrofitted here.
+- **D3 — per-task id-referencing commits (the load-bearing convention).** As planned,
+  each task was committed with `T<n>: … (US-<m>)`; this made the repo self-hosting so
+  `impact(src/aspark_graph/inference.py)` returns `US-1` (inferred) on the real repo —
+  the exact query empty at the start of the cycle.
 
 ---
 
