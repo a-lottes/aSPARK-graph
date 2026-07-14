@@ -89,3 +89,12 @@ def test_diff_files_bad_range(repo):
 def test_diff_files_empty_range(repo):
     files, err = gitmod.diff_files(repo, "   ")
     assert files == [] and "empty" in err.lower()
+
+
+def test_diff_files_bare_filename_is_not_silently_a_pathspec(repo):
+    # F2: a bare filename must not be read as a pathspec (empty success) — the
+    # `--` separator forces it to be parsed as a revision, which fails cleanly.
+    (repo / "a.py").write_text("x = 99\n")  # a.py exists as a file
+    files, err = gitmod.diff_files(repo, "a.py")
+    assert err is not None
+    assert files == []
