@@ -49,6 +49,44 @@ def test_t3_non_git_repo_yields_zero_inferred(tmp_path):
     assert entry["affected_stories"] == []
 
 
+def _feature(root, name, task, story):
+    d = root / ".spark" / name
+    d.mkdir(parents=True)
+    (d / "spec.md").write_text(
+        f"# Spec: {name}\n\n| **Status** | `approved` |\n\n## 4. User Stories\n\n"
+        f"### {story} (Must): S\n\n- [ ] {story}.1: y.\n"
+    )
+    (d / "plan.md").write_text(
+        f"# Plan: {name}\n\n| **Status** | `approved` |\n\n## 3. Task Breakdown\n\n"
+        "| # | Task | Story | Depends on | Status | Definition of Done |\n"
+        "|---|---|---|---|---|---|\n"
+        f"| {task} | Impl | {story} | – | `done` | x |\n"
+    )
+
+
+def test_f1_cross_feature_id_collision_disambiguated(tmp_path, git_tools):
+    """Two features both have a task T1, but map it to DIFFERENT stories. A
+    commit `T1 (US-1)` must attribute only to the feature whose T1→US-1 (F1)."""
+    root = tmp_path
+    git_tools["init"](root)
+    # alpha: T1 -> US-1 ; beta: T1 -> US-2 (same task id, different story)
+    _feature(root, "alpha", "T1", "US-1")
+    _feature(root, "beta", "T1", "US-2")
+    git_tools["commit"](root, "docs: trails")
+    (root / "shared.py").write_text("def f():\n    return 1\n")
+    # Commit names the (T1, US-1) pair -> only alpha's T1 is consistent.
+    git_tools["commit"](root, "T1: implement shared (US-1)")
+
+    graph, _ = build_graph(root)
+    impl = [(e["source"], e["target"]) for e in graph.edges() if e["type"] == "implements"]
+    assert (task_id("alpha", "T1"), file_id("shared.py")) in impl
+    assert (task_id("beta", "T1"), file_id("shared.py")) not in impl  # US-2 != US-1
+
+    # And impact reflects only alpha.
+    r = queries.impact(graph, ["shared.py"])
+    assert {s["id"] for s in r["affected_stories"]} == {story_id("alpha", "US-1")}
+
+
 def test_t4_inference_is_deterministic(git_backed_repo):
     g1, _ = build_graph(git_backed_repo)
     g2, _ = build_graph(git_backed_repo)

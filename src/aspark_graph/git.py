@@ -39,38 +39,49 @@ def is_git_repo(root: str | Path) -> bool:
     return code == 0 and out.strip() == "true"
 
 
-def commits_touching(root: str | Path, ids: set[str]) -> dict[str, list[str]]:
-    """Map each id in ``ids`` to the sorted list of tracked files touched by a
-    commit whose message references that id.
+def log_records(root: str | Path) -> list[dict]:
+    """Return one record per non-merge commit reachable from ``HEAD``, each
+    ``{"message": str, "files": [str, ...]}``.
 
-    Deterministic: no dates are read; the file set is a pure function of the
-    reachable-from-HEAD commit DAG and the ids. Returns ``{}`` when git is
-    unavailable or ``ids`` is empty.
+    Deterministic: no dates are read; the records are a pure function of the
+    reachable-from-``HEAD`` commit DAG (git's fixed default order). Returns
+    ``[]`` when git is unavailable. This is the primitive inference reads so it
+    can attribute *per commit* (message ids AND touched paths together), rather
+    than collapsing the commit boundary.
     """
-    if not ids or not is_git_repo(root):
-        return {}
-    # Format: RS <hash> FS <full message> FS  ; then --name-only appends the
-    # file list. No date fields anywhere (determinism).
-    fmt = f"{_RS}%H{_FS}%B{_FS}"
+    if not is_git_repo(root):
+        return []
+    # Format: RS <full message> FS ; then --name-only appends the file list.
+    # No hash, no date fields anywhere (determinism).
+    fmt = f"{_RS}%B{_FS}"
     code, out = _run(root, ["log", "--no-merges", "--name-only", f"--format={fmt}"])
     if code != 0 or not out:
-        return {}
-
-    id_pattern = re.compile(r"\b(" + "|".join(re.escape(i) for i in sorted(ids)) + r")\b")
-    result: dict[str, set[str]] = {i: set() for i in ids}
+        return []
+    records = []
     for record in out.split(_RS):
         if not record.strip():
             continue
         parts = record.split(_FS)
-        if len(parts) < 3:
+        if len(parts) < 2:
             continue
-        message, files_blob = parts[1], parts[2]
-        matched = set(id_pattern.findall(message))
-        if not matched:
-            continue
+        message, files_blob = parts[0], parts[1]
         files = [line.strip() for line in files_blob.splitlines() if line.strip()]
+        records.append({"message": message, "files": files})
+    return records
+
+
+def commits_touching(root: str | Path, ids: set[str]) -> dict[str, list[str]]:
+    """Map each id in ``ids`` to the sorted list of tracked files touched by a
+    commit whose message references that id. Thin id-only view over
+    :func:`log_records` (kept for callers that don't need per-commit context)."""
+    if not ids:
+        return {}
+    id_pattern = re.compile(r"\b(" + "|".join(re.escape(i) for i in sorted(ids)) + r")\b")
+    result: dict[str, set[str]] = {i: set() for i in ids}
+    for rec in log_records(root):
+        matched = set(id_pattern.findall(rec["message"]))
         for i in matched:
-            result[i].update(files)
+            result[i].update(rec["files"])
     return {i: sorted(fs) for i, fs in result.items() if fs}
 
 
@@ -82,7 +93,10 @@ def diff_files(root: str | Path, diff_range: str) -> tuple[list[str], str | None
         return [], "empty diff range"
     if not is_git_repo(root):
         return [], "not a git repository"
-    code, out = _run(root, ["diff", "--no-color", "--name-only", diff_range])
+    # The trailing `--` forces <diff_range> to be parsed as a revision range,
+    # so a bare filename is not silently treated as a pathspec (F2) — it fails
+    # to resolve and we report it as an invalid range.
+    code, out = _run(root, ["diff", "--no-color", "--name-only", diff_range, "--"])
     if code != 0:
         return [], f"invalid diff range: {diff_range!r}"
     files = sorted({line.strip() for line in out.splitlines() if line.strip()})
