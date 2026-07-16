@@ -40,11 +40,8 @@ def test_ac_4_3_rebuild_restores_current(git_backed_repo):
 
 
 def test_cli_and_mcp_staleness_agree(git_backed_repo, capsys):
-    import asyncio
     import json
-    from fastmcp import Client
-    from aspark_graph import cli
-    from aspark_graph.server import mcp
+    from aspark_graph import cli, server
 
     graph, _ = build_graph(git_backed_repo)
     graph.save(default_graph_path(git_backed_repo))
@@ -54,8 +51,5 @@ def test_cli_and_mcp_staleness_agree(git_backed_repo, capsys):
     assert rc == 0
     cli_out = json.loads(capsys.readouterr().out)
 
-    async def call():
-        async with Client(mcp) as c:
-            return (await c.call_tool("staleness", {"repo": repo})).data
-
-    assert cli_out == asyncio.run(call())
+    # @mcp.tool() leaves the function directly callable, returning the MCP dict.
+    assert cli_out == server.staleness(repo=repo)

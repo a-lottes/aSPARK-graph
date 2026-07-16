@@ -40,12 +40,9 @@ def test_ac_3_2_diff_unknown_paths_named_via_impact(git_backed_repo, git_tools):
 
 
 def test_cli_impact_diff_matches_mcp(git_backed_repo, capsys):
-    import asyncio
     import json
-    from fastmcp import Client
-    from aspark_graph import cli
+    from aspark_graph import cli, server
     from aspark_graph.graph import default_graph_path
-    from aspark_graph.server import mcp
 
     graph, _ = build_graph(git_backed_repo)
     graph.save(default_graph_path(git_backed_repo))
@@ -55,8 +52,5 @@ def test_cli_impact_diff_matches_mcp(git_backed_repo, capsys):
     assert rc == 0
     cli_out = json.loads(capsys.readouterr().out)
 
-    async def call():
-        async with Client(mcp) as c:
-            return (await c.call_tool("impact", {"diff": "HEAD~1..HEAD", "repo": repo})).data
-
-    assert cli_out == asyncio.run(call())
+    # @mcp.tool() leaves the function directly callable, returning the MCP dict.
+    assert cli_out == server.impact(diff="HEAD~1..HEAD", repo=repo)

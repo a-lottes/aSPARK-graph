@@ -4,18 +4,13 @@ Parity with the CLI's AC-5.2 behaviour (which prints a clean message and exits
 1) — the MCP client must not receive a raised GraphNotBuiltError.
 """
 
-import asyncio
-
-from fastmcp import Client
-
-from aspark_graph.server import mcp
+from aspark_graph import server
 
 
 def _call(tool, params):
-    async def go():
-        async with Client(mcp) as c:
-            return (await c.call_tool(tool, params)).data
-    return asyncio.run(go())
+    # @mcp.tool() leaves the function directly callable; it returns the same
+    # dict the MCP surface serialises (a clean 'build first' dict on error).
+    return getattr(server, tool)(**params)
 
 
 def test_query_before_build_returns_clean_error(tmp_path):

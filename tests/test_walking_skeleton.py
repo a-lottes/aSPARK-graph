@@ -1,11 +1,11 @@
 """T3: the walking skeleton — Python extraction, build, get_node, CLI and MCP.
 
-The MCP path is exercised via FastMCP's in-memory client, which performs the
-real protocol handshake and tool dispatch. The live-Claude-Code check is a
-/demo-day item (see the plan's test strategy).
+The MCP path is exercised by calling the tool function in-process (the
+@mcp.tool() decorator leaves it directly callable), which returns the same dict
+the MCP surface serialises. The live-Claude-Code check is a /demo-day item (see
+the plan's test strategy).
 """
 
-import asyncio
 import json
 
 import pytest
@@ -75,8 +75,7 @@ def test_get_node_missing_returns_not_found(tmp_path):
 # --- CLI and MCP return the same answer (seeds AC-5.1) ---------------------
 
 def test_cli_and_mcp_get_node_agree(tmp_path, capsys):
-    from fastmcp import Client
-    from aspark_graph.server import mcp
+    from aspark_graph import server
 
     repo = _write_repo(tmp_path)
     graph, _ = build_graph(repo)
@@ -88,12 +87,8 @@ def test_cli_and_mcp_get_node_agree(tmp_path, capsys):
     assert rc == 0
     cli_out = json.loads(capsys.readouterr().out)
 
-    # MCP (in-memory transport = real handshake + dispatch)
-    async def call():
-        async with Client(mcp) as c:
-            res = await c.call_tool("get_node", {"id": node_id, "repo": str(repo)})
-            return res.data
-
-    mcp_out = asyncio.run(call())
+    # MCP: @mcp.tool() leaves the function directly callable, returning the same
+    # dict the MCP surface serialises.
+    mcp_out = server.get_node(id=node_id, repo=str(repo))
     assert cli_out == mcp_out
     assert cli_out["found"] is True

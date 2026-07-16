@@ -7,8 +7,12 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .venv/
+.venv-test/
 build/
 dist/
+
+# graphify knowledge-graph output (disposable, rebuildable)
+graphify-out/
 
 # uv
 uv.lock merge=binary

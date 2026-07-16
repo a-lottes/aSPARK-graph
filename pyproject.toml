@@ -1,6 +1,6 @@
 [project]
 name = "aspark-graph"
-version = "0.1.0"
+version = "0.3.0"
 description = "A lean, local code-and-artifact knowledge graph that speaks SPARK."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,11 +10,23 @@ keywords = ["mcp", "knowledge-graph", "aspark", "tree-sitter", "code-graph"]
 
 # The tree-sitter core + grammars are pinned EXACTLY: a grammar version bump can
 # change node types and thus the extracted graph, which would break the
-# byte-stable-rebuild guarantee (AC-1.2). fastmcp/networkx do not affect the
-# serialised graph (persistence is canonicalised in-house), so a floor + the
+# byte-stable-rebuild guarantee (AC-1.2). mcp/networkx do not affect the
+# serialised graph (persistence is canonicalised in-house), so a range + the
 # committed uv.lock is the determinism contract for those.
+#
+# The MCP server is a local stdio server using the official `mcp` SDK's FastMCP
+# (no auth, no HTTP). The range is bounded on both ends deliberately:
+#  - `<1.20`: mcp 1.20 added a direct `cryptography` dependency (server-side OAuth
+#    we do not use); `cryptography` has no macOS x86_64 wheel, so pulling it made
+#    the tool uninstallable on Intel macOS (distributable-install US-1). Lift the
+#    cap only alongside a real auth/remote-transport feature.
+#  - `>=1.12`: the lowest version verified to expose `mcp.server.fastmcp.FastMCP`
+#    with the `@mcp.tool()` API this server (and its in-process test harness that
+#    calls the decorated functions directly) relies on. A downstream install
+#    without our uv.lock still resolves an API-compatible mcp (distributable-
+#    install review F2).
 dependencies = [
-    "fastmcp>=2.0",
+    "mcp>=1.12,<1.20",
     "networkx>=3.2",
     "tree-sitter==0.26.0",
     "tree-sitter-python==0.25.0",

@@ -3,11 +3,14 @@
 Every tool delegates to the same functions the CLI uses, so MCP and CLI answers
 are identical by construction (AC-5.1). Tools return plain dicts; FastMCP
 serialises them.
+
+Uses the official `mcp` SDK's FastMCP (a local stdio server, no auth/HTTP). See
+pyproject for why `mcp` is capped below the version that pulls `cryptography`.
 """
 
 from __future__ import annotations
 
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 
 from . import queries
 from .build import build_graph as _build_graph
@@ -15,7 +18,7 @@ from .build import build_graph as _build_graph
 mcp = FastMCP("aspark-graph")
 
 
-@mcp.tool
+@mcp.tool()
 def build_graph(path: str = ".") -> dict:
     """(Re)scan a repository and its .spark/ artifacts and persist the graph."""
     graph, report = _build_graph(path)
@@ -39,14 +42,14 @@ def _open(repo: str):
         return None, {"found": False, "error": str(exc)}
 
 
-@mcp.tool
+@mcp.tool()
 def get_node(id: str, repo: str = ".") -> dict:
     """Look up a single node by its id (e.g. 'file:src/foo.py')."""
     graph, err = _open(repo)
     return err or queries.get_node(graph, id)
 
 
-@mcp.tool
+@mcp.tool()
 def story_trace(story: str, feature: str | None = None, repo: str = ".") -> dict:
     """Full thread of a user story: acceptance criteria (with their latest QA
     verdict), mapped plan tasks, and any best-effort code links."""
@@ -54,7 +57,7 @@ def story_trace(story: str, feature: str | None = None, repo: str = ".") -> dict
     return err or queries.story_trace(graph, story, feature)
 
 
-@mcp.tool
+@mcp.tool()
 def impact(files: list[str] | None = None, diff: str | None = None, repo: str = ".") -> dict:
     """Blast radius of a change: the stories and acceptance criteria that depend
     on the given files (or the files in a git `diff` range), each tagged with its
@@ -69,7 +72,7 @@ def impact(files: list[str] | None = None, diff: str | None = None, repo: str = 
     return queries.impact(graph, files or [])
 
 
-@mcp.tool
+@mcp.tool()
 def gate_health(feature: str, repo: str = ".") -> dict:
     """The aSPARK gate invariants as data: orphan tasks, unverified acceptance
     criteria, and open findings for a feature."""
@@ -77,28 +80,28 @@ def gate_health(feature: str, repo: str = ".") -> dict:
     return err or queries.gate_health(graph, feature)
 
 
-@mcp.tool
+@mcp.tool()
 def staleness(repo: str = ".") -> dict:
     """Report whether the built graph still matches the repo on disk (US-4)."""
     graph, err = _open(repo)
     return err or queries.staleness(graph, repo)
 
 
-@mcp.tool
+@mcp.tool()
 def find_nodes(query: str, type: str | None = None, repo: str = ".") -> dict:
     """Find nodes whose id or name contains a substring, optionally by type."""
     graph, err = _open(repo)
     return err or queries.find_nodes(graph, query, type)
 
 
-@mcp.tool
+@mcp.tool()
 def get_neighbors(id: str, edge_types: list[str] | None = None, depth: int = 1, repo: str = ".") -> dict:
     """Nodes within `depth` hops of a node (both directions); 'what touches this?'."""
     graph, err = _open(repo)
     return err or queries.get_neighbors(graph, id, edge_types, depth)
 
 
-@mcp.tool
+@mcp.tool()
 def shortest_path(a: str, b: str, repo: str = ".") -> dict:
     """An ordered path connecting two nodes, or an explicit 'no path' result."""
     graph, err = _open(repo)

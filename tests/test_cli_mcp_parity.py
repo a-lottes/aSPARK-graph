@@ -5,15 +5,11 @@ asserted by driving both adapters over the shared query functions.
 AC-5.2: a query before any build gives a clear 'build first' message, no trace.
 """
 
-import asyncio
 import json
 from pathlib import Path
 
-from fastmcp import Client
-
-from aspark_graph import cli, queries
+from aspark_graph import cli, queries, server
 from aspark_graph.build import build_graph
-from aspark_graph.server import mcp
 
 SAMPLE_REPO = Path(__file__).parent / "fixtures" / "sample_repo"
 
@@ -25,12 +21,11 @@ def _cli_json(capsys, argv) -> dict:
 
 
 def _mcp_data(tool: str, params: dict):
-    async def call():
-        async with Client(mcp) as c:
-            res = await c.call_tool(tool, params)
-            return res.data
-
-    return asyncio.run(call())
+    # The @mcp.tool() decorator leaves the underlying function directly callable,
+    # and it returns the same plain dict the MCP surface serialises. Calling it
+    # in-process is the faithful way to assert CLI≡MCP parity over the shared
+    # query functions — no transport needed.
+    return getattr(server, tool)(**params)
 
 
 def _prepare(tmp_path):
