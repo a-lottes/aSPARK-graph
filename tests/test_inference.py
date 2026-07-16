@@ -87,6 +87,36 @@ def test_f1_cross_feature_id_collision_disambiguated(tmp_path, git_tools):
     assert {s["id"] for s in r["affected_stories"]} == {story_id("alpha", "US-1")}
 
 
+def test_f1_story_only_ambiguous_commit_attributes_to_neither(tmp_path, git_tools):
+    """The real-repo case the first fix missed: two features map the SAME task
+    id to the SAME story id (alpha T1→US-1, beta T1→US-1). A story-only commit
+    `(US-1)` that touches NO `.spark/` tree is genuinely ambiguous — it must not
+    fan the file out across both features. A co-touch commit still resolves
+    correctly, so the file keeps its one legitimate link."""
+    root = tmp_path
+    git_tools["init"](root)
+    _feature(root, "alpha", "T1", "US-1")
+    _feature(root, "beta", "T1", "US-1")  # SAME task id AND same story
+    git_tools["commit"](root, "docs: trails")
+    # A co-touch commit for alpha: touches alpha's .spark tree + shared.py.
+    (root / "shared.py").write_text("def f():\n    return 1\n")
+    (root / ".spark" / "alpha" / "plan.md").write_text(
+        (root / ".spark" / "alpha" / "plan.md").read_text() + "\n<!-- touched by T1 -->\n"
+    )
+    git_tools["commit"](root, "T1: implement shared (US-1)")
+    # A story-only fix commit that touches shared.py again, no .spark tree.
+    (root / "shared.py").write_text("def f():\n    return 2\n")
+    git_tools["commit"](root, "fix: patch shared (US-1)")
+
+    graph, _ = build_graph(root)
+    impl = [(e["source"], e["target"]) for e in graph.edges() if e["type"] == "implements"]
+    # alpha keeps its legitimate co-touch link; beta is never attributed.
+    assert (task_id("alpha", "T1"), file_id("shared.py")) in impl
+    assert (task_id("beta", "T1"), file_id("shared.py")) not in impl
+    r = queries.impact(graph, ["shared.py"])
+    assert {s["id"] for s in r["affected_stories"]} == {story_id("alpha", "US-1")}
+
+
 def test_t4_inference_is_deterministic(git_backed_repo):
     g1, _ = build_graph(git_backed_repo)
     g2, _ = build_graph(git_backed_repo)

@@ -32,9 +32,18 @@ def infer_implements(graph: Graph, repo_root: str | Path) -> int:
     A file is linked to a task when a commit whose message references the task's
     id (or its mapped story's id) touched that file. To avoid cross-feature
     over-attribution when two features reuse the same ``T<n>``/``US<n>``
-    numbering (F1), a commit that touched a ``.spark/<feature>/`` tree is
-    attributed **only** to tasks of the feature(s) it touched; a commit that
-    touched no ``.spark/`` tree (a pure code commit) falls back to id matching.
+    numbering (F1), every commit is first resolved to the feature(s) it belongs
+    to, and only tasks of those features can match:
+
+    - a commit that touched a ``.spark/<feature>/`` tree belongs to that feature
+      (co-touch is authoritative);
+    - otherwise the commit's referenced ids must resolve to exactly **one**
+      feature (e.g. via a ``T<n> (US<n>)`` pairing that is unique across
+      features). If the ids are consistent with two or more features — the
+      residual collision case, e.g. a story-only ``(US-1)`` commit that touches
+      no ``.spark/`` tree while two features both map a task to ``US-1`` — the
+      commit is genuinely ambiguous and contributes **no** edges. An honest
+      absence beats an obviously-wrong cross-feature link (AC-1.4).
     """
     if not git.is_git_repo(repo_root):
         return 0
@@ -59,8 +68,25 @@ def infer_implements(graph: Graph, repo_root: str | Path) -> int:
         return 0
     id_pattern = re.compile(r"\b(" + "|".join(re.escape(i) for i in sorted(all_ids)) + r")\b")
 
-    # Pre-compute per commit: the task ids and story ids it references, and the
-    # features it belongs to (from touched .spark/<feature>/ paths).
+    def _matches(tid_: str | None, story_: str | None, c_tasks: set[str], c_stories: set[str]) -> bool:
+        # Semantic pairing: a commit naming BOTH a task id and a story id is
+        # about that (task, story) pair, so a task must match on *both* —
+        # otherwise the shared id numbering collides with another feature (e.g.
+        # commit "T9 (US-3)" is close-the-loop's T9→US-3, not aspark-graph's
+        # T9→US-4 nor its US-3-mapped T7). A task-only or story-only commit
+        # matches on the id it does name.
+        if c_tasks and c_stories:
+            return tid_ in c_tasks and story_ in c_stories
+        if c_tasks:
+            return tid_ in c_tasks
+        if c_stories:
+            return story_ in c_stories
+        return False
+
+    # Pre-compute per commit: the ids it references, and the feature(s) it can
+    # be resolved to. Co-touch (a touched .spark/<feature>/ tree) is
+    # authoritative; otherwise the ids must resolve to exactly one feature, else
+    # the commit is ambiguous and dropped (F1).
     parsed = []
     for rec in records:
         matched = set(id_pattern.findall(rec["message"]))
@@ -69,34 +95,24 @@ def infer_implements(graph: Graph, repo_root: str | Path) -> int:
         commit_tasks = {m for m in matched if m.startswith("T")}
         commit_stories = {m for m in matched if m.startswith("US")}
         commit_features = {m.group(1) for f in rec["files"] if (m := _SPARK_FEATURE_RE.search(f))}
-        parsed.append((commit_tasks, commit_stories, commit_features, rec["files"]))
+        if commit_features:
+            resolved = commit_features
+        else:
+            consistent = {feat for feat, tid_, story_ in tasks.values()
+                          if _matches(tid_, story_, commit_tasks, commit_stories)}
+            resolved = consistent if len(consistent) == 1 else set()
+        if not resolved:
+            continue
+        parsed.append((commit_tasks, commit_stories, resolved, rec["files"]))
 
     added = 0
     for task_node_id in sorted(tasks):
         feature, tid, story_ref = tasks[task_node_id]
         files: set[str] = set()
-        for commit_tasks, commit_stories, commit_features, touched in parsed:
-            # F1 disambiguation A (semantic pairing). When a commit names BOTH a
-            # task id and a story id it is about that (task, story) pair, so this
-            # feature's task must match on *both* — otherwise the shared id
-            # numbering collides with another feature (e.g. commit "T9 (US-3)"
-            # is close-the-loop's T9→US-3, not aspark-graph's T9→US-4 nor its
-            # US-3-mapped T7). A task-only or story-only commit matches on the id
-            # it does name.
-            if commit_tasks and commit_stories:
-                match = tid in commit_tasks and story_ref in commit_stories
-            elif commit_tasks:
-                match = tid in commit_tasks
-            elif commit_stories:
-                match = story_ref in commit_stories
-            else:
-                match = False
-            if not match:
+        for commit_tasks, commit_stories, resolved, touched in parsed:
+            if feature not in resolved:
                 continue
-            # F1 disambiguation B (co-touch tie-break) for the residual case
-            # where two features share the *same* (task, story) pair: if the
-            # commit touched a feature's .spark/ tree, restrict to those features.
-            if commit_features and feature not in commit_features:
+            if not _matches(tid, story_ref, commit_tasks, commit_stories):
                 continue
             files.update(touched)
         existing = {tgt for tgt, _ in graph.out_edges(task_node_id, EdgeType.IMPLEMENTS)}

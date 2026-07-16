@@ -288,10 +288,20 @@ guardrails**, not soft goals.
   `inferred` (weakest) tier. It breaks no AC — the correct story is always among the
   results, and the spurious one is exactly the tolerated inferred false positive
   A4/AC-1.4 anticipate (weak tier + human confirmation). Recorded as a precision
-  limitation. **Superseded by the review fix F1:** `inference.py` now
-  disambiguates via semantic (task→story) pairing plus a `.spark/<feature>/`
-  co-touch tie-break, so cross-feature over-attribution is eliminated on the real
-  repo (aspark-graph-sourced `implements` edges: 8 → 0). See review-report F1.
+  limitation. **Resolved by the review fix F1 (two rounds):** `inference.py` now
+  resolves every commit to a feature before matching — co-touch of a
+  `.spark/<feature>/` tree is authoritative, and a commit with no `.spark/`
+  signal is attributed only if its ids resolve to exactly one feature (semantic
+  `T<n> (US<n>)` pairing); an ambiguous commit (e.g. a story-only `(US-1)` fix
+  commit that touches no `.spark/` tree while both features map a task to `US-1`)
+  contributes no edges. The first-round fix left that story-only case open (a
+  commit's bare `(US-1)` still fanned across both features), so at that HEAD
+  there were **21** aspark-graph-sourced `implements` edges, not 0; the earlier
+  "8 → 0" figure had been measured on the working tree before the fix commits
+  were themselves committed. The second-round fix closes it: rebuilt on the real
+  repo, aspark-graph-sourced `implements` edges are now genuinely **0**
+  (`impact(model.py)` / `impact(inference.py)` are close-the-loop-only), and the
+  double-build stays byte-identical. See review-report F1.
 - **D3 — per-task id-referencing commits (the load-bearing convention).** As planned,
   each task was committed with `T<n>: … (US-<m>)`; this made the repo self-hosting so
   `impact(src/aspark_graph/inference.py)` returns `US-1` (inferred) on the real repo —
