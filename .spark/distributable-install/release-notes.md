@@ -5,7 +5,7 @@
 | **Phase** | Keep |
 | **Owner** | Release Manager (`/go-live`) |
 | **Input** | `distributable-install/review-report.md` (`passed`), `close-the-loop/review-report.md` (`passed`); no `qa.md` (QA-gate override — see below) |
-| **Status** | `preparing` |
+| **Status** | `released` |
 | **Version** | v0.3.0 |
 | **Date** | 2026-07-16 |
 
@@ -206,16 +206,21 @@ assumption:**
 Because name ownership and token configuration are **unknown at prepare time**, the
 PyPI publish is escalated to the user as a decision, not performed on assumption.
 
-## 7. Post-Release Smoke Check (to run AFTER an authorized deploy/publish)
+## 7. Post-Release Smoke Check (run 2026-07-16 — PASSED)
 
-Not yet run — this is a prepare-only pass. When publish/deploy is authorized:
+Ran against the **public** GitHub tag after the authorized push + GitHub Release
+(PyPI publish was skipped by the user this release):
 
-- Install the published artifact into a fresh env on a supported platform; confirm
-  `cryptography` absent and both `aspark-graph` and `aspark-graph serve` work.
-- Run the released core flow: `aspark-graph build .` then
-  `aspark-graph query impact --diff <range>` / `story_trace US-1` returns real,
-  correctly-tiered results.
-- Confirm `serve` boots over stdio and registers all 9 tools; logs are quiet.
+- `uv pip install "git+https://github.com/a-lottes/aSPARK-graph.git@v0.3.0"` into a
+  fresh Python 3.13 venv (no checkout) → **install succeeds**; reported version
+  **0.3.0**.
+- `cryptography` and `fastmcp` **absent** from the installed tree (`mcp` present).
+- `aspark-graph` CLI runs; `aspark-graph serve` / `aspark_graph.server` registers
+  **all 9 tools**.
+
+The released artifact is installable and runnable by a third party straight from the
+public tag, toolchain-free, on Intel macOS — the feature's headline promise, proven
+on the shipped thing.
 
 ## 8. Learnings (Keep!)
 
@@ -256,6 +261,6 @@ Not yet run — this is a prepare-only pass. When publish/deploy is authorized:
 
 - [x] All pre-flight checks passed at release time (103 passed, byte-identical build, clean-env wheel install verified; QA gate overridden with recorded reason + authorizer)
 - [x] Changelog written in user-facing language (no hashes, tickets, or jargon)
-- [ ] Release actions executed and verified — **local commit + tag done; outward push/PR/publish PENDING user go (prepare-only pass)**
+- [x] Release actions executed and verified — `main` + tag `v0.3.0` pushed, GitHub Release published, post-release smoke check passed against the public tag (§7). PyPI publish deliberately skipped this release (user decision; README stays honest — no `uvx` claim).
 - [x] Learnings recorded
 - [ ] Status set to `released` — currently `preparing` (awaiting go for the outward-facing steps)
