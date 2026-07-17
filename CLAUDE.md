@@ -14,7 +14,9 @@ Full SPARK trails live under `.spark/`: `aspark-graph/` (v0.1.0, the base),
 `close-the-loop/` (v0.2.0 — git-history inference of `implements` edges,
 `staleness`, `impact --diff`, the `inferred` tier), `distributable-install/`
 (v0.3.0 — dropped the native `cryptography` dep, MCP now on the official `mcp`
-SDK). **Current shipped version: 0.3.1.** Read the relevant trail before changing
+SDK), `gate-integration/` (v0.3.1 — portable aSPARK gate integration blocks,
+31-test doc-introspection harness, Reviewer block dogfooded in CLAUDE.md).
+**Current shipped version: 0.3.1.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention

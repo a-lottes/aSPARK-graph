@@ -5,7 +5,7 @@
 | **Phase** | Keep |
 | **Owner** | Release Manager (`/go-live`) |
 | **Input** | `review-report.md` (`passed`), QA gate (N/A — see §0) |
-| **Status** | `preparing` |
+| **Status** | `released` |
 | **Version** | v0.3.1 |
 | **Date** | 2026-07-17 |
 
