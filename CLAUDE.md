@@ -10,8 +10,12 @@ delivery artifacts, so agents can ask `story_trace` ("which code implements this
 story, and did its ACs pass QA?") and `impact` ("what's the blast radius of
 changing these files?"). Deterministic, offline, disposable read model.
 
-The full spec/plan/review/qa/release trail for v0.1.0 lives in
-`.spark/aspark-graph/` — read it before changing behaviour.
+Full SPARK trails live under `.spark/`: `aspark-graph/` (v0.1.0, the base),
+`close-the-loop/` (v0.2.0 — git-history inference of `implements` edges,
+`staleness`, `impact --diff`, the `inferred` tier), `distributable-install/`
+(v0.3.0 — dropped the native `cryptography` dep, MCP now on the official `mcp`
+SDK). **Current shipped version: 0.3.0.** Read the relevant trail before changing
+behaviour.
 
 ## Layout & the one load-bearing convention
 
@@ -23,7 +27,9 @@ src/aspark_graph/
   artifacts.py   .spark/ template parser (fails loudly on drift)
   queries.py     THE shared query surface — all query logic lives here
   cli.py         thin adapter over queries.py/build.py
-  server.py      thin FastMCP adapter over queries.py/build.py
+  server.py      thin adapter over queries.py/build.py (mcp-SDK FastMCP)
+  inference.py   git-history inference of implements edges (v0.2.0)
+  git.py         offline, deterministic git helpers (no timestamps)
   extractors/    code_py / code_ts / code_java + base + dispatch
 ```
 
@@ -45,30 +51,57 @@ each adapter. Never compute an answer in an adapter.
 - **Clean errors, never tracebacks.** Domain errors (drift, graph-not-built) are
   caught at the CLI/MCP edge → one-line message + non-zero exit. No stack traces
   to the user.
-- **`implements` (task→code) is best-effort.** Only emitted where an explicit
-  inline `files:` note in a plan task resolves to a real file. Its absence is
-  expected, not a bug — `story_trace`/`impact` must stay correct without it.
+- **`implements` (task→code) is best-effort, from two sources.** A `declared`
+  edge from an explicit inline `files:` note in a plan task, and an `inferred`
+  edge derived from git history (`inference.py`: a commit referencing a task/story
+  id links the files it touched). Its absence is expected, not a bug —
+  `story_trace`/`impact` must stay correct without it.
+- **Git inference resolves each commit to ONE feature before id-matching
+  (`inference.py`, F1 — don't regress).** When multiple `.spark/` features reuse
+  the same `T<n>`/`US<n>` numbering, a commit is attributed only to a single
+  feature: a touched `.spark/<feature>/` tree is authoritative (co-touch), else the
+  ids must resolve to exactly one feature; an ambiguous id-only commit contributes
+  **no** edge. Honest absence beats a wrong cross-feature link (AC-1.4). Reads only
+  committed state (paths + message ids, never timestamps), so it stays deterministic.
 - **Confidence tags.** Every story/AC link from `impact` carries the *weakest*
-  edge confidence on its strongest path (`extracted` < `declared`). Don't
-  conflate a structural code link with a declared artifact link.
+  edge confidence on its strongest path (`inferred` < `extracted` < `declared`;
+  `inferred` is rank 0). Don't conflate a git-inferred link with a structural code
+  link or a declared artifact link.
+- **MCP dep is the `mcp` SDK, capped `mcp>=1.12,<1.20` (don't lift the cap).**
+  `mcp` 1.20+ hard-pulls `cryptography` (server-side OAuth we don't use), which has
+  no macOS x86_64 wheel → made the tool uninstallable on Intel macOS. The stdio
+  server uses no auth. Floor `>=1.12` is the lowest version verified to expose
+  `mcp.server.fastmcp.FastMCP` + `@mcp.tool()` with the directly-callable-decorator
+  contract the in-process test harness relies on. Lift the cap only alongside a real
+  auth/remote-transport feature.
 
 ## Working here
 
 ```bash
-export PATH="/opt/homebrew/bin:$PATH"   # uv lives here on this machine
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 65 tests; keep green
+uv run pytest                # 103 tests; keep green
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .
 ```
 
-The tool **dogfoods itself**: its own `.spark/aspark-graph/` trail is the primary
-test fixture. When you touch the parser or a query, assert against that trail.
+The tool **dogfoods itself**: its own `.spark/` trails are the primary test
+fixture, and `impact`/`story_trace` on the live repo are the real QA surface. When
+you touch the parser or a query, assert against those trails.
 
-## Out of scope for v0.1.0
+**QA gate for this headless tool.** There is no UI, so `/demo-day` (browser QA) is
+structurally N/A — the QA-equivalent (full suite, clean-env packaged install,
+`serve` boot, byte-identical build, a real-repo `impact` check) is done in
+`/peer-review`. Overriding the QA gate at `/go-live` is legitimate here, but record
+the authorizer + reason in the release report — never a silent skip.
+
+## Out of scope (through v0.3.0)
 
 More languages, an LLM/NL layer, precise call-graph resolution, incremental
-updates, a visualization UI, exports, HTTP/team mode. See the spec's Out-of-Scope
-list. Tier-1 candidates (recorded during the build): an explicit `files:` column
-in the aSPARK plan template (needs an aSPARK PR), SQLite/incremental builds, and
-the F4 review nits (guard `find_nodes("")`, prune skip-dirs during the walk).
+updates, a visualization UI, exports, HTTP/team mode, authenticated/remote MCP
+transport, and a live PyPI publish (deferred; the package is install-from-source
+only, so keep the README free of `uvx`/PyPI claims until it's actually published).
+Tier-1 candidates (recorded during the builds): an explicit `files:` column in the
+aSPARK plan template (needs an aSPARK PR), SQLite/incremental builds, the F4 review
+nits (guard `find_nodes("")`, prune skip-dirs during the walk), and a thin
+transport-level MCP smoke test (the parity suite now calls tools in-process).
