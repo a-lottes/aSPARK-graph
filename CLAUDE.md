@@ -14,7 +14,7 @@ Full SPARK trails live under `.spark/`: `aspark-graph/` (v0.1.0, the base),
 `close-the-loop/` (v0.2.0 — git-history inference of `implements` edges,
 `staleness`, `impact --diff`, the `inferred` tier), `distributable-install/`
 (v0.3.0 — dropped the native `cryptography` dep, MCP now on the official `mcp`
-SDK). **Current shipped version: 0.3.0.** Read the relevant trail before changing
+SDK). **Current shipped version: 0.3.1.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention
@@ -75,12 +75,67 @@ each adapter. Never compute an answer in an adapter.
   contract the in-process test harness relies on. Lift the cap only alongside a real
   auth/remote-transport feature.
 
+## Using aspark-graph in /peer-review (this repo)
+
+**aspark-graph is an accelerant, not a hard dependency.** A peer-review with a
+missing or stale graph is no weaker than the manual approach — grep/Read the
+`.spark/` files and source directly. Do not block the gate on graph availability.
+
+**QA-Tester half (`/demo-day`): N/A.** aspark-graph is headless (no UI); the
+QA-equivalent is done hands-on in `/peer-review` (full suite, clean-env install,
+`serve` boot, byte-identical build, real-repo impact check). No active demo-day
+block applies here.
+
+### Step 0 — confirm the graph is fresh first
+
+```bash
+aspark-graph query staleness
+```
+
+- If **absent or stale**: fall back to grep/Read for this run. State that you
+  did so. The manual method remains valid.
+- If **fresh**: proceed with the steps below.
+
+### Step 1 — scope the blast radius of the diff
+
+```bash
+aspark-graph query impact <changed files>
+```
+
+Or from a git range:
+
+```bash
+aspark-graph query impact --diff <range>
+```
+
+### Step 2 — trace each Must-story
+
+```bash
+aspark-graph query story_trace <US-n> --feature aspark-graph
+```
+
+### Step 3 — check AC coverage and pass state
+
+```bash
+aspark-graph query gate_health aspark-graph
+```
+
+### Interpreting results
+
+- A graph hit is scoping input, not a verdict — still trace and judge the code.
+- Confidence tiers: `inferred` < `extracted` < `declared`. An `inferred` hit is
+  a git-history hint; confirm before treating as established.
+- An empty or `{"found": false}` result means: fall back and confirm manually.
+  Absent ≠ nothing to review.
+
+---
+
 ## Working here
 
 ```bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 103 tests; keep green
+uv run pytest                # 134 tests; keep green
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .
 ```

@@ -49,6 +49,11 @@ and orphan detection possible at all.
   scope, no conflict. aspark-graph is an accelerant for aSPARK, not a replacement
   for a code-search tool.
 
+**Using aspark-graph in aSPARK gates?** See
+[`docs/aspark-integration.md`](docs/aspark-integration.md) for drop-in
+`CLAUDE.md` blocks that wire the `/peer-review` and `/demo-day` gates to the
+query tools.
+
 ---
 
 ## The graph model (read this to interpret any result)
