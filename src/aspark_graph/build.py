@@ -1,8 +1,13 @@
-"""Full-rescan build: walk a repo, extract code, parse artifacts, link them.
+"""Build: walk a repo, extract code, parse artifacts, link them.
 
 Deterministic and offline (AC-1.2): files are visited in sorted order, ids are
 content/location-derived, and the graph is serialised canonically. A rebuild of
 an unchanged repo yields an identical graph.
+
+Incremental path: on repeated builds, unchanged files are reused from
+.aspark-graph/parse-cache.json without re-invoking the tree-sitter extractors.
+The cache is supplemental — graph.json stays canonical. A corrupt, absent, or
+version-mismatched cache silently falls back to a full rescan (US-3).
 """
 
 from __future__ import annotations
@@ -11,9 +16,9 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from . import artifacts, extractors, inference
+from . import artifacts, extractors, inference, parse_cache
 from .extractors.base import FileExtraction, language_for
-from .graph import Graph
+from .graph import Graph, default_graph_path
 from .model import (
     Confidence,
     EdgeType,
@@ -38,6 +43,11 @@ class BuildReport:
     artifact_entities: int = 0
     inferred_edges: int = 0
     unparsed: list[str] = field(default_factory=list)
+    # Incremental-build accounting (T1+):
+    incremental: bool = False     # True when the cache was used for this build
+    reparsed: int = 0             # files that went through the extractor
+    cached: int = 0               # files reused from the parse cache
+    fallback_reason: str | None = None  # set when incremental was attempted but fell back
 
     def summary(self) -> str:
         line = f"{self.code_entities} code entities, {self.artifact_entities} artifact entities"
@@ -45,41 +55,84 @@ class BuildReport:
             line += f", {self.inferred_edges} inferred link(s)"
         if self.unparsed:
             line += f", {len(self.unparsed)} file(s) unparsed"
+        if self.incremental:
+            line += f"; incremental: {self.reparsed} re-parsed, {self.cached} cached"
+        else:
+            line += "; full rescan"
         return line
 
 
-def build_graph(repo_root: str | Path) -> tuple[Graph, BuildReport]:
+def build_graph(repo_root: str | Path, *, full: bool = False) -> tuple[Graph, BuildReport]:
+    """Build (or incrementally update) the knowledge graph for a repo.
+
+    When full=True, ignore any cached parse results and rescan every file.
+    When full=False (the default), reuse cached FileExtraction objects for
+    unchanged files; fall back to a full rescan if the cache is unusable.
+    """
     repo_root = Path(repo_root).resolve()
     graph = Graph()
     report = BuildReport()
 
+    # Incremental path: only attempted when graph.json already exists (anchor
+    # rule) and full rescan was not requested. First builds always scan everything.
+    cache: parse_cache.ParseCache | None = None
+    if not full and default_graph_path(repo_root).exists():
+        try:
+            cache = parse_cache.load(repo_root)
+        except parse_cache.CacheUnusable as exc:
+            report.fallback_reason = str(exc)
+
+    report.incremental = cache is not None
+
     extractions: list[FileExtraction] = []
+    # Triples for cache write after the build: (relpath, sha256, extraction).
+    cache_triples: list[tuple[str, str, FileExtraction]] = []
+
     for path in _iter_source_files(repo_root):
         relpath = _relpath(path, repo_root)
         language = language_for(relpath)
         if language is None:
-            continue  # not a source file the tool knows about
+            continue
         source = path.read_bytes()
         digest = hashlib.sha256(source).hexdigest()[:16]
-        extractor = extractors.get_extractor(language)
-        if extractor is None:
-            # Known language, no extractor (unsupported / A9 early-cut): AC-4.2.
-            graph.add_node(file_id(relpath), NodeType.FILE, language=language, hash=digest, unparsed=True)
-            report.unparsed.append(relpath)
-            continue
-        extraction = extractor(relpath, source)
+
+        # Cache-or-parse seam: the only place that decides whether to invoke the
+        # extractor. Everything downstream is identical regardless of origin.
+        extraction: FileExtraction | None = None
+        if cache is not None:
+            extraction = cache.lookup(relpath, digest)
+
+        if extraction is not None:
+            report.cached += 1
+        else:
+            extractor = extractors.get_extractor(language)
+            if extractor is None:
+                # Known language, no extractor registered yet (unsupported extension).
+                graph.add_node(file_id(relpath), NodeType.FILE, language=language, hash=digest, unparsed=True)
+                report.unparsed.append(relpath)
+                continue
+            extraction = extractor(relpath, source)
+            report.reparsed += 1
+
         graph.add_node(file_id(relpath), NodeType.FILE, language=language, hash=digest, package=extraction.package)
         _add_definitions(graph, extraction)
         extractions.append(extraction)
+        cache_triples.append((relpath, digest, extraction))
 
     _resolve_imports(graph, extractions)
 
     report.code_entities = graph.counts()["code"]
     report.artifact_entities = artifacts.extract_features(repo_root, graph)
-    # Best-effort inferred implements edges from git history (declared edges from
-    # files: notes are already in place and are never overwritten). No-op if git
-    # is unavailable (AC-1.6).
+    # Best-effort inferred implements edges from git history. No-op if git
+    # is unavailable (AC-1.6). Inference is out of scope for incremental
+    # caching this cycle — it runs on every build (unchanged from prior versions).
     report.inferred_edges = inference.infer_implements(graph, repo_root)
+
+    # Always rewrite the cache after a successful build (full or incremental).
+    # This means --full replaces the cache with fresh state (AC-4.2) and first
+    # builds leave a cache ready for the next incremental run.
+    parse_cache.save(repo_root, cache_triples)
+
     return graph, report
 
 

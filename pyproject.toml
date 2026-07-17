@@ -1,6 +1,6 @@
 [project]
 name = "aspark-graph"
-version = "0.3.1"
+version = "0.4.0"
 description = "A lean, local code-and-artifact knowledge graph that speaks SPARK."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -49,3 +49,5 @@ packages = ["src/aspark_graph"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: wall-clock performance benchmarks (excluded from default run; use -m slow)"]
+addopts = "-m 'not slow'"

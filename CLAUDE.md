@@ -15,8 +15,10 @@ Full SPARK trails live under `.spark/`: `aspark-graph/` (v0.1.0, the base),
 `staleness`, `impact --diff`, the `inferred` tier), `distributable-install/`
 (v0.3.0 — dropped the native `cryptography` dep, MCP now on the official `mcp`
 SDK), `gate-integration/` (v0.3.1 — portable aSPARK gate integration blocks,
-31-test doc-introspection harness, Reviewer block dogfooded in CLAUDE.md).
-**Current shipped version: 0.3.1.** Read the relevant trail before changing
+31-test doc-introspection harness, Reviewer block dogfooded in CLAUDE.md),
+`incremental-builds/` (v0.4.0 — file-level parse cache, `--full` flag,
+`CacheUnusable` fallback, NFR-1 benchmark).
+**Current shipped version: 0.4.0.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention
@@ -25,7 +27,8 @@ behaviour.
 src/aspark_graph/
   model.py       node/edge vocabulary, id schemes, Confidence enum
   graph.py       networkx MultiDiGraph wrapper + canonical graph.json
-  build.py       full-rescan walk + per-language import resolution
+  build.py       full-rescan or incremental walk + per-language import resolution
+  parse_cache.py per-file FileExtraction cache (JSON sidecar, v0.4.0)
   artifacts.py   .spark/ template parser (fails loudly on drift)
   queries.py     THE shared query surface — all query logic lives here
   cli.py         thin adapter over queries.py/build.py
@@ -137,7 +140,7 @@ aspark-graph query gate_health aspark-graph
 ```bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 134 tests; keep green
+uv run pytest                # 161 tests; keep green
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .
 ```

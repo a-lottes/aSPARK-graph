@@ -26,6 +26,8 @@ def main(argv: list[str] | None = None) -> int:
 
     p_build = sub.add_parser("build", help="(Re)scan a repo + .spark/ and persist the graph.")
     p_build.add_argument("path", nargs="?", default=".", help="Repo root (default: .)")
+    p_build.add_argument("--full", action="store_true", default=False,
+                         help="Force a full rescan, ignoring any cached parse results.")
 
     sub.add_parser("serve", help="Run the MCP stdio server.")
 
@@ -161,12 +163,12 @@ _QUERY_NAMES = list(_QUERY_ARGS)
 
 def _cmd_build(args) -> int:
     try:
-        graph, report = build_graph(args.path)
+        graph, report = build_graph(args.path, full=args.full)
     except artifacts.TemplateDriftError as exc:
-        # AC-1.3: fail loudly naming the file + mismatch, but without leaking a
-        # Python traceback to the user (same CLI-UX contract as AC-5.2).
         print(str(exc), file=sys.stderr)
         return 1
+    if report.fallback_reason:
+        print(f"Cache unusable ({report.fallback_reason}); fell back to full rescan.", file=sys.stderr)
     out_path = default_graph_path(args.path)
     graph.save(out_path)
     print(f"Built graph: {report.summary()}")
