@@ -312,6 +312,8 @@ _SEARCHABLE_ATTRS = ("name", "title", "story", "ac", "task", "finding")
 
 def find_nodes(graph: Graph, query: str, type: str | None = None) -> dict:
     """Find nodes whose id or a searchable attribute contains ``query``."""
+    if query == "":
+        return {"query": query, "type": type, "count": 0, "nodes": []}
     q = query.lower()
     want = type.lower() if type else None
     matches = []

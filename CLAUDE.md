@@ -17,8 +17,9 @@ Full SPARK trails live under `.spark/`: `aspark-graph/` (v0.1.0, the base),
 SDK), `gate-integration/` (v0.3.1 — portable aSPARK gate integration blocks,
 31-test doc-introspection harness, Reviewer block dogfooded in CLAUDE.md),
 `incremental-builds/` (v0.4.0 — file-level parse cache, `--full` flag,
-`CacheUnusable` fallback, NFR-1 benchmark).
-**Current shipped version: 0.4.0.** Read the relevant trail before changing
+`CacheUnusable` fallback, NFR-1 benchmark),
+`robustness/` (v0.4.1 — `find_nodes("")` empty-query guard, MCP stdio transport smoke test).
+**Current shipped version: 0.4.1.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention
@@ -140,7 +141,8 @@ aspark-graph query gate_health aspark-graph
 ```bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 161 tests; keep green
+uv run pytest                # 165 tests; keep green
+uv run pytest -m slow        # 2 slow tests: NFR-1 bench + MCP transport smoke
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .
 ```
@@ -162,6 +164,7 @@ updates, a visualization UI, exports, HTTP/team mode, authenticated/remote MCP
 transport, and a live PyPI publish (deferred; the package is install-from-source
 only, so keep the README free of `uvx`/PyPI claims until it's actually published).
 Tier-1 candidates (recorded during the builds): an explicit `files:` column in the
-aSPARK plan template (needs an aSPARK PR), SQLite/incremental builds, the F4 review
-nits (guard `find_nodes("")`, prune skip-dirs during the walk), and a thin
-transport-level MCP smoke test (the parity suite now calls tools in-process).
+aSPARK plan template (needs an aSPARK PR), SQLite/incremental builds, the whitespace-only
+query guard for `find_nodes` (C8 — the empty-string guard ships in v0.4.1; strip-and-check
+extension is still deferred), and exhaustive MCP tool coverage in the transport smoke
+test (US-2 proves the transport; in-process parity covers correctness).

@@ -57,3 +57,25 @@ def test_get_neighbors_depth_and_direction(sample_graph):
     neighbor_ids = {n["id"] for n in r["neighbors"]}
     assert ac_id("demo", "AC-1.1") in neighbor_ids
     assert all(n["edge"] == "has_ac" for n in r["neighbors"])
+
+
+def test_find_nodes_empty_query_returns_empty_result(sample_graph):
+    """AC-1.1: find_nodes("") returns count 0 and no nodes, not the whole graph."""
+    graph, _ = sample_graph
+    r = queries.find_nodes(graph, "")
+    assert r == {"query": "", "type": None, "count": 0, "nodes": []}
+
+
+def test_find_nodes_empty_query_with_type_filter_returns_empty(sample_graph):
+    """AC-1.2: type filter does not bypass the empty-query guard."""
+    graph, _ = sample_graph
+    r = queries.find_nodes(graph, "", type="Story")
+    assert r == {"query": "", "type": "Story", "count": 0, "nodes": []}
+
+
+def test_find_nodes_nonempty_query_unaffected(sample_graph):
+    """AC-1.5: non-empty queries are not affected by the empty-query guard."""
+    graph, _ = sample_graph
+    r = queries.find_nodes(graph, "US-1", type="Story")
+    assert r["count"] == 1
+    assert r["nodes"][0]["id"] == story_id("demo", "US-1")

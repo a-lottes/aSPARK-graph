@@ -57,6 +57,15 @@ def test_get_node_cli_equals_mcp(tmp_path, capsys):
     assert cli_out == mcp_out
 
 
+def test_find_nodes_empty_query_cli_equals_mcp(tmp_path, capsys):
+    """AC-1.3 + AC-1.4: CLI and MCP both return the empty-result dict for query=""."""
+    repo = _prepare(tmp_path)
+    cli_out = _cli_json(capsys, ["query", "find_nodes", "--repo", repo, ""])
+    mcp_out = _mcp_data("find_nodes", {"query": "", "repo": repo})
+    assert cli_out == mcp_out
+    assert cli_out == {"query": "", "type": None, "count": 0, "nodes": []}
+
+
 def test_ac_5_2_query_before_build_is_a_clear_message(tmp_path, capsys):
     rc = cli.main(["query", "get_node", "--repo", str(tmp_path), "file:whatever.py"])
     err = capsys.readouterr().err
