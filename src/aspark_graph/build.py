@@ -171,10 +171,19 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
     """Best-effort File -> File ``imports`` edges (static; may be incomplete)."""
     py_index = _python_module_index(extractions)
     java_index = _java_type_index(extractions)
+    go_index = _go_package_index(extractions)
+    rust_index = _rust_module_index(extractions)
     rel_index = {e.relpath for e in extractions}
     for e in extractions:
         src = file_id(e.relpath)
         for imp in e.imports:
+            if e.language == "go":
+                # A Go import addresses a package (a directory), not a single
+                # file, so an unambiguous match can fan out to several files.
+                for target_rel in _resolve_go_import(imp, e.relpath, go_index):
+                    if target_rel in rel_index and target_rel != e.relpath:
+                        graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
+                continue
             target_rel = None
             if e.language == "python":
                 target_rel = _resolve_python_import(imp, e.relpath, py_index)
@@ -182,6 +191,8 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
                 target_rel = _resolve_ts_import(imp, e.relpath, rel_index)
             elif e.language == "java":
                 target_rel = java_index.get(imp.module)
+            elif e.language == "rust":
+                target_rel = _resolve_rust_import(imp, e.relpath, rust_index)
             # Only emit an edge when we resolve to a file that is in the graph.
             if target_rel and target_rel in rel_index and target_rel != e.relpath:
                 graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
@@ -222,6 +233,99 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
             if d.kind == "Class" and d.parent is None:
                 index.setdefault(f"{prefix}{d.qualname}", e.relpath)
     return index
+
+
+def _go_package_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
+    """Map a repo directory path (the Go package it holds) -> its .go files."""
+    index: dict[str, list[str]] = {}
+    for e in extractions:
+        if e.language != "go":
+            continue
+        dir_path = PurePosixPath(e.relpath).parent.as_posix()
+        if dir_path in (".", ""):
+            continue  # root-level "main" packages are not meaningfully importable
+        index.setdefault(dir_path, []).append(e.relpath)
+    for files in index.values():
+        files.sort()
+    return index
+
+
+def _resolve_go_import(imp, importer_rel: str, dir_index: dict[str, list[str]]) -> list[str]:
+    """Trailing-path-segment match of an import path against repo directories.
+
+    No `go.mod` parsing (A3): a stdlib/third-party import simply matches no
+    repo directory. An import path matching more than one candidate directory
+    is ambiguous and resolves to no edge (A7) rather than a guess.
+    """
+    path = imp.module
+    candidates = [d for d in dir_index if d == path or path.endswith(f"/{d}")]
+    if len(candidates) != 1:
+        return []
+    return [f for f in dir_index[candidates[0]] if f != importer_rel]
+
+
+def _rust_module_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
+    """Map a crate-relative module path (``crate::foo::bar``) -> its .rs file(s).
+
+    Layout-only (no `Cargo.toml`/workspace awareness, A3): `src/lib.rs` and
+    `src/main.rs` are the crate root; `src/foo.rs` and `src/foo/mod.rs` are
+    module `foo`; `src/foo/bar.rs` is `foo::bar`. More than one file mapping
+    to the same module path is a genuine collision our no-manifest index
+    can't disambiguate — recorded as multiple candidates so resolution can
+    refuse to guess (AC-4.3), never a silent first-writer-wins pick.
+    """
+    index: dict[str, list[str]] = {}
+    for e in extractions:
+        if e.language != "rust":
+            continue
+        key = f"crate::{_rust_module_path_of(e.relpath)}" if _rust_module_path_of(e.relpath) else "crate"
+        index.setdefault(key, []).append(e.relpath)
+    return index
+
+
+def _resolve_rust_import(imp, importer_rel: str, index: dict[str, list[str]]) -> str | None:
+    """Resolve a ``crate::``/``self::``/``super::``-relative ``use`` path.
+
+    External crates (any other leading segment) never resolve to a repo file
+    — correctly emitting no edge (AC-4.2). ``self``/``super`` are resolved
+    relative to the importing file's own module path.
+    """
+    path = imp.module
+    head, _, rest = path.partition("::")
+    if head == "crate":
+        candidate = f"crate::{rest}" if rest else "crate"
+        return _lookup_or_parent(candidate, index)
+    if head in ("self", "super"):
+        importer_module = _rust_module_path_of(importer_rel)
+        base_parts = importer_module.split("::") if importer_module else []
+        if head == "super":
+            base_parts = base_parts[:-1]
+        candidate_parts = base_parts + ([rest] if rest else [])
+        candidate = "::".join(["crate", *candidate_parts]) if candidate_parts else "crate"
+        return _lookup_or_parent(candidate, index)
+    return None  # external crate — no repo file, correctly unresolved
+
+
+def _rust_module_path_of(relpath: str) -> str:
+    stripped = relpath[4:] if relpath.startswith("src/") else relpath
+    without_ext = stripped[:-3] if stripped.endswith(".rs") else stripped
+    parts = without_ext.split("/")
+    if parts and parts[-1] in ("mod", "lib", "main"):
+        parts = parts[:-1]
+    return "::".join(p for p in parts if p)
+
+
+def _lookup_or_parent(candidate: str, index: dict[str, list[str]]) -> str | None:
+    # `use crate::foo::Bar` addresses the *item* Bar inside module foo; try the
+    # full path first, then walk up to the nearest enclosing module file. A
+    # key with more than one candidate file is ambiguous — no edge (A7).
+    while True:
+        files = index.get(candidate)
+        if files is not None:
+            return files[0] if len(files) == 1 else None
+        if "::" not in candidate:
+            return None
+        candidate = candidate.rsplit("::", 1)[0]
 
 
 def _resolve_python_import(imp, importer_rel: str, index: dict[str, str]) -> str | None:

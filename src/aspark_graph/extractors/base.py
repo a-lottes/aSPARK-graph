@@ -51,6 +51,8 @@ EXTENSION_LANGUAGE = {
     ".mjs": "javascript",
     ".cjs": "javascript",
     ".java": "java",
+    ".go": "go",
+    ".rs": "rust",
 }
 
 

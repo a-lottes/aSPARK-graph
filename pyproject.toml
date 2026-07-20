@@ -1,6 +1,6 @@
 [project]
 name = "aspark-graph"
-version = "0.4.1"
+version = "0.5.0"
 description = "A lean, local code-and-artifact knowledge graph that speaks SPARK."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,6 +32,8 @@ dependencies = [
     "tree-sitter-python==0.25.0",
     "tree-sitter-typescript==0.23.2",
     "tree-sitter-java==0.23.5",
+    "tree-sitter-go==0.25.0",
+    "tree-sitter-rust==0.24.2",
 ]
 
 [project.scripts]

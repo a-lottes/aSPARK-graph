@@ -18,8 +18,10 @@ SDK), `gate-integration/` (v0.3.1 — portable aSPARK gate integration blocks,
 31-test doc-introspection harness, Reviewer block dogfooded in CLAUDE.md),
 `incremental-builds/` (v0.4.0 — file-level parse cache, `--full` flag,
 `CacheUnusable` fallback, NFR-1 benchmark),
-`robustness/` (v0.4.1 — `find_nodes("")` empty-query guard, MCP stdio transport smoke test).
-**Current shipped version: 0.4.1.** Read the relevant trail before changing
+`robustness/` (v0.4.1 — `find_nodes("")` empty-query guard, MCP stdio transport smoke test),
+`go-rust-support/` (v0.5.0 — Go and Rust extractors: `File`/`Class`/`Function` nodes,
+best-effort in-repo `imports` resolution; six languages supported).
+**Current shipped version: 0.5.0.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention

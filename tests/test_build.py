@@ -44,6 +44,17 @@ def test_double_build_is_deterministic(tmp_path):  # AC-1.2
     assert p1.read_text() == p2.read_text()
 
 
+def test_double_build_six_language_repo_is_deterministic(tmp_path):  # go-rust-support AC-5.1
+    (tmp_path / "a.py").write_text("def f():\n    return 1\n")
+    (tmp_path / "b.ts").write_text("export function g() { return 1; }\n")
+    (tmp_path / "C.java").write_text("public class C { public void m() {} }\n")
+    (tmp_path / "d.go").write_text("package main\n\ntype Widget struct{}\n\nfunc (w *Widget) M() {}\n")
+    (tmp_path / "e.rs").write_text("pub struct Widget {}\n\nimpl Widget {\n    pub fn m(&self) {}\n}\n")
+    g1, _ = build_graph(tmp_path)
+    g2, _ = build_graph(tmp_path)
+    assert g1.to_dict() == g2.to_dict()
+
+
 def test_double_build_byte_identical_at_default_path(tmp_path):  # AC-1.2 via CLI path
     _write_code_repo(tmp_path)
     g1, _ = build_graph(tmp_path)

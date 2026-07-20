@@ -47,16 +47,22 @@ def test_build_resolves_java_import(tmp_path):  # AC-4.1 Java
     ) in edges
 
 
-def test_all_three_languages_in_one_build(tmp_path):  # AC-4.1: none may be missing
+def test_all_six_languages_in_one_build(tmp_path):  # AC-4.1 / go-rust-support AC-5.1: none may be missing
     (tmp_path / "a.py").write_text("def f():\n    return 1\n")
     (tmp_path / "b.ts").write_text("export function g() { return 1; }\n")
     (tmp_path / "C.java").write_text("public class C { public void m() {} }\n")
+    (tmp_path / "d.go").write_text("package main\n\nfunc D() int { return 1 }\n")
+    (tmp_path / "e.rs").write_text("pub fn e() -> i32 { 1 }\n")
     graph, _ = build_graph(tmp_path)
     langs = {n.get("language") for n in graph.nodes() if n["type"] == "File"}
-    assert {"python", "typescript", "java"} <= langs
+    assert {"python", "typescript", "java", "go", "rust"} <= langs
     assert graph.has_node(definition_id("a.py", "f"))
     assert graph.has_node(definition_id("b.ts", "g"))
     assert graph.has_node(definition_id("C.java", "C"))
+    assert graph.has_node(definition_id("d.go", "D"))
+    assert graph.has_node(definition_id("e.rs", "e"))
+    unparsed = {n["id"] for n in graph.nodes() if n["type"] == "File" and n.get("unparsed")}
+    assert unparsed == set()
 
 
 def test_ac_4_2_unsupported_language_becomes_unparsed_file_node(tmp_path, monkeypatch):
