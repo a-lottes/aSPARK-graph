@@ -1,3 +1,9 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/aSPARK-graph-logo-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/aSPARK-graph-logo-light.png">
+  <img alt="aSPARK-graph logo" src="docs/aSPARK-graph-logo-light.png" width="480">
+</picture>
+
 # 🕸️ aspark-graph
 
 > **A lean, local knowledge graph that joins a repo's _code_ to its _delivery artifacts_ — so agents and humans can trace a user story to the code that implements it, and see the story-level blast radius of a change.**
@@ -136,6 +142,19 @@ claude mcp add aspark-graph -- uv run --directory /path/to/aspark-graph aspark-g
 Until aspark-graph is published to a package index, the from-source path above is
 the supported install.
 
+## Update
+
+```bash
+cd /path/to/aspark-graph
+git pull
+uv sync
+uv run aspark-graph build /path/to/your/repo   # rebuild after update
+```
+
+The graph is not forwards-compatible across versions: always rebuild after `git pull`.
+Incremental builds (v0.4.0+) make this fast — only changed files are re-parsed, so a
+routine update rebuild takes seconds on most repos.
+
 ## Build the graph
 
 ```bash
@@ -223,12 +242,12 @@ fails on an unknown language.
 - **Disposable.** The graph is a read model. Delete `.aspark-graph/` and rebuild;
   the source of truth is always the code and the `.spark/` files.
 
-## Out of scope (v0.1.0)
+## Out of scope
 
-More languages, an LLM/natural-language layer, precise call-graph resolution,
-incremental updates, a visualization UI, exports (Neo4j/GraphML/Obsidian), and
-HTTP/team mode are all out of scope. See `.spark/aspark-graph/spec.md` for the
-full, honest Out-of-Scope list.
+Languages beyond the six currently supported, an LLM/natural-language layer, precise
+call-graph resolution, a visualization UI, exports (Neo4j/GraphML/Obsidian), HTTP/team
+mode, and authenticated or remote MCP transport are out of scope. The current language
+support is Python, TypeScript/JavaScript, Java, Go, and Rust.
 
 ## Development
 
