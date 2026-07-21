@@ -4,11 +4,39 @@
 |---|---|
 | **Phase** | Release |
 | **Owner** | Release Manager (`/go-live`) |
-| **Status** | `preparing` |
+| **Status** | `released` |
 | **Date** | 2026-07-18 |
 | **Version** | 0.4.1 |
 | **Previous version** | 0.4.0 |
 | **Bump level** | patch — backwards-compatible correctness fix to an existing query |
+
+---
+
+## Post-Release Close-Out Note (added 2026-07-21)
+
+This release was fully prepared and gated on 2026-07-18, but the local
+release commit (`d3c5ff5`) and local tag `v0.4.1` were never pushed at the
+time — this note's own status was left at `preparing` for three days while
+a subsequent, unrelated feature (`go-rust-support`, v0.5.0) was built,
+reviewed, and prepared on top of it.
+
+It shipped on **2026-07-21**, bundled with `go-rust-support` v0.5.0 in a
+single `git push origin main` (explicit user authorization) that carried
+both `d3c5ff5` and `31b2a0d` in one fast-forward push, followed by
+`git push origin v0.5.0`. **Note: the local `v0.4.1` tag itself was not
+pushed in this ceremony** — only the `v0.5.0` tag push was explicitly
+authorized; `git push origin v0.4.1` remains a pending, separately-
+authorizable action (the commit `d3c5ff5` is on the remote `main` branch
+regardless, since tags and branch history are independent — the code is
+published, but there is no `v0.4.1` ref on the remote to point at it yet).
+Both releases had independently passed their own gates and pre-flight
+checks before the bundled push; bundling changed only the timing of
+publication, not the gating. See `.spark/go-rust-support/release-notes.md` for the bundled
+push's full record and the shared post-release smoke check (both releases
+are verified live at the same post-push commit).
+
+No content below this note was changed — the original pre-flight results,
+changelog, and learnings from 2026-07-18 stand as written.
 
 ---
 
@@ -166,7 +194,7 @@ git reset --hard HEAD~1
 - [x] Changelog written in user-facing language — no commit hashes, no ticket IDs, no internal jargon
 - [x] Release commit prepared with exact file list; local tag `v0.4.1` created
 - [x] Rollback path written before any outward-facing action
-- [x] Outward-facing actions (push, tag push) listed and NOT executed — awaiting explicit go
+- [x] Outward-facing actions executed (partial): `git push origin main` on 2026-07-21 carried `d3c5ff5` to the remote (verified: `git log` on origin/main shows it, `git ls-remote --tags origin` confirms `main` is at `31b2a0d` which has `d3c5ff5` as its parent). **`git push origin v0.4.1` (the tag itself) was NOT executed** — only `git push origin v0.5.0` was explicitly authorized in this ceremony; the local `v0.4.1` tag still needs its own explicit go to publish. Flagged as an open item below.
 - [x] Learnings written: what went well, what to do differently, patterns to persist
-- [ ] Status updated to `released` — pending go
-- [ ] Post-release smoke confirmed — pending deploy
+- [x] Status updated to `released` — shipped 2026-07-21, bundled with go-rust-support v0.5.0 push
+- [x] Post-release smoke confirmed — see `.spark/go-rust-support/release-notes.md` post-release smoke check (shared, same push, same commit)

@@ -4,7 +4,7 @@
 |---|---|
 | **Phase** | Release |
 | **Owner** | Release Manager (`/go-live`) |
-| **Status** | `preparing` |
+| **Status** | `released` |
 | **Date** | 2026-07-21 |
 | **Version** | 0.5.0 |
 | **Previous version** | 0.4.1 |
@@ -186,27 +186,66 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 
 ---
 
-## Pending Outward-Facing Actions (awaiting explicit go)
+## Release Actions (executed 2026-07-21)
 
-The following commands are prepared but **not executed**. They require
-explicit user authorization, relayed by the caller, before they run:
+The human explicitly authorized both (1) bundling — pushing the queued
+`robustness` v0.4.1 commit (`d3c5ff5`) together with this release's commit
+(`31b2a0d`) in one `git push`, rather than pushing v0.4.1 separately first
+— and (2) the push itself, in this conversation. Both commands were run,
+in order, on the exact prepared commit:
 
 ```bash
-# 1. Push the release commit(s) to the remote
-#    NOTE: this will also push d3c5ff5 (robustness v0.4.1), which is still
-#    unpublished — see the flagged note in Pre-Flight Results above.
-git push origin main
+$ git push origin main
+To https://github.com/a-lottes/aSPARK-graph.git
+   61d6e88..31b2a0d  main -> main
 
-# 2. Push the local tag
-git push origin v0.5.0
-
-# (if v0.4.1 should ship separately/first, that needs its own explicit go
-#  and its own post-release smoke check before v0.5.0 is pushed on top)
+$ git push origin v0.5.0
+To https://github.com/a-lottes/aSPARK-graph.git
+ * [new tag]         v0.5.0 -> v0.5.0
 ```
+
+Both commands exited 0. `git push origin main` carried **two** commits to
+the remote in one fast-forward: `d3c5ff5` (robustness v0.4.1, previously
+unpushed since 2026-07-18) and `31b2a0d` (go-rust-support v0.5.0). See
+`.spark/robustness/release-notes.md` for that release's own close-out,
+completed alongside this one.
+
+**Not executed, and out of scope for this ceremony's explicit
+authorization:** `git push origin v0.4.1` (the robustness tag). Only the
+`v0.5.0` tag push was explicitly authorized here. The `robustness` commit
+`d3c5ff5` is published on `main` regardless (tags are independent refs),
+but there is currently no `v0.4.1` tag on the remote. This is flagged as an
+open item for the human — see "What I need back" below.
 
 There is no PyPI publish step — the package remains install-from-source
 only; the README (unmodified by this release) contains no `uvx`/PyPI
 claims.
+
+---
+
+## Post-Release Smoke Check (2026-07-21)
+
+Performed against the actual published state — the remote's `main` HEAD
+and the `v0.5.0` tag — not against the local pre-push working tree.
+
+| Check | Command | Result |
+|---|---|---|
+| Local HEAD matches remote | `git log --oneline -3` after push | `31b2a0d` (go-rust-support v0.5.0), `d3c5ff5` (robustness v0.4.1), `61d6e88` — local and `origin/main` both at `31b2a0d`, `git status` confirms "up to date with origin/main" |
+| Remote tag correctness | `git ls-remote --tags origin` | `refs/tags/v0.5.0` → `31b2a0dd2fda9515dad62f0e2690ce281965e9c6`, exactly matching local `HEAD`/`31b2a0d` — no drift, no annotated-tag dereference mismatch |
+| Fresh clone of the published tag | `git clone --branch v0.5.0 <remote-url>` into a scratch dir | Clean checkout, detached HEAD at `31b2a0dd2fda9515dad62f0e2690ce281965e9c6` — confirms the tag is real, pushed, and fetchable by a third party, not just present in the local ref cache |
+| Clean-venv install from the fresh clone | `uv sync --extra dev` | Resolved and installed cleanly (mcp==1.19.0, tree-sitter-go==0.25.0, tree-sitter-rust==0.24.2, and the rest of the locked set) — no dependency error |
+| Build, from the fresh clone against itself | `uv run aspark-graph build .` | `Built graph: 456 code entities, 276 artifact entities, 68 inferred link(s); full rescan` — no error |
+| Staleness, from the fresh clone | `uv run aspark-graph query staleness --repo .` | `{"stale": false, "changed": [], "missing": [], "files_checked": 49, "advice": null}` |
+| Real query exercising the shipped feature | `uv run aspark-graph query find_nodes --repo . code_rust` | `count: 12` — the new `code_rust.py` extractor's own functions plus its `File` node, found by the tool it ships in the same release; confirms Go/Rust extraction is live end to end at the published commit, not just present in source |
+| `impact` on the new extractor file | `uv run aspark-graph query impact --repo . src/aspark_graph/extractors/code_rust.py` | `found: true`, all 11 functions listed under `code_entities` — blast-radius query works against the new language's own code |
+| Full test suite, from the fresh clone | `uv run pytest -q` | **187 passed, 2 deselected** — identical result to the pre-push pre-flight, now reproduced independently from a clean clone + clean venv, not the developer's synced environment |
+
+All checks passed. The product is verifiably up: the app (CLI) responds,
+the released feature's core flow (Go/Rust parsing → graph → query) works
+against a real, freshly-cloned, freshly-installed copy of the exact
+published commit, and no error or exception surfaced anywhere in the
+chain. Scratch clone deleted after the check (`rm -rf`), no artifacts left
+behind.
 
 ---
 
@@ -331,7 +370,20 @@ is untouched code.
 - [x] Changelog written in user-facing language — no commit hashes, no ticket IDs, no internal jargon
 - [x] Release commit prepared with exact file list; local tag `v0.5.0` created
 - [x] Rollback path written before any outward-facing action
-- [x] Outward-facing actions (push, tag push) listed and NOT executed — awaiting explicit go
+- [x] Outward-facing actions executed with explicit user authorization: `git push origin main` (2026-07-21, carried `d3c5ff5` + `31b2a0d`), `git push origin v0.5.0` — both confirmed by actual command output, not assumed
 - [x] Learnings written: what went well, what to do differently, patterns to persist
-- [ ] Status updated to `released` — pending go
-- [ ] Post-release smoke confirmed — pending deploy
+- [x] Status updated to `released` — go received and executed 2026-07-21
+- [x] Post-release smoke confirmed — fresh clone of `v0.5.0`, clean venv install, real build + queries + full suite, all green (see "Post-Release Smoke Check" above)
+
+### What I need back
+
+1. **The `robustness` v0.4.1 tag (`v0.4.1`) was never pushed** — only the
+   commit (`d3c5ff5`, now on remote `main`) and the `v0.5.0` tag were
+   authorized and pushed in this ceremony. If a `v0.4.1` ref should exist
+   on the remote (e.g. for anyone pinning to that exact tag rather than a
+   commit), it needs its own explicit go: `git push origin v0.4.1`.
+2. **`README.md` and `docs/aSPARK-graph-logo-*.png`** remain uncommitted,
+   out-of-scope working-tree changes, now present across three consecutive
+   release cycles (`robustness`, `go-rust-support`, and now this close-out).
+   They should be triaged — committed as their own tiny change or
+   discarded — rather than continuing to accumulate.
