@@ -91,6 +91,27 @@ each adapter. Never compute an answer in an adapter.
   `mcp.server.fastmcp.FastMCP` + `@mcp.tool()` with the directly-callable-decorator
   contract the in-process test harness relies on. Lift the cap only alongside a real
   auth/remote-transport feature.
+- **Test fixtures are marked, never bypassed (confinement, v0.6.0).** A test that
+  needs an unmarked directory builds its own `.git`-marked subdirectory; there is
+  no environment variable, flag, or tool parameter that disables the confinement
+  rule (asserted by `test_confinement_guards.py`). Don't add one — an autouse
+  bypass would run the whole suite through code no user runs, which is a worse
+  guarantee than not having a bypass at all.
+- **A new refusal reuses the existing exception→adapter seam** — raise in the
+  shared module (`queries.py`/`confinement.py`), catch and render once each in
+  `cli.py`/`server.py` — rather than inventing new plumbing per refusal kind.
+  This is what made confinement's CLI↔MCP parity (v0.6.0) free instead of a
+  second thing to keep in sync.
+- **A document that makes guarantee claims (e.g. `SECURITY.md`) pairs N named,
+  counted entries with a keyword denylist checked outside them** (v0.6.0's
+  `test_security_doc.py`). Catches regression and drift, not adversarial
+  rephrasing — the honesty guarantee still rests partly on a human `/peer-review`
+  read.
+- **Prove determinism against actual pre-change code, not just a double-build
+  with the new code.** A double-build only proves the new code is
+  self-consistent; a `git stash` round-trip (build a fixed fixture under the old
+  code, then the new code, diff the two) is what actually proves a change didn't
+  perturb an accepted repo's graph (v0.6.0's T13 regression sweep).
 
 ## Using aspark-graph in /peer-review (this repo)
 
@@ -152,7 +173,7 @@ aspark-graph query gate_health aspark-graph
 ```bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 165 tests; keep green
+uv run pytest                # 275 tests; keep green
 uv run pytest -m slow        # 2 slow tests: NFR-1 bench + MCP transport smoke
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .
@@ -167,6 +188,18 @@ structurally N/A — the QA-equivalent (full suite, clean-env packaged install,
 `serve` boot, byte-identical build, a real-repo `impact` check) is done in
 `/peer-review`. Overriding the QA gate at `/go-live` is legitimate here, but record
 the authorizer + reason in the release report — never a silent skip.
+
+**Never resume a possibly-interrupted `/go-live` from a prior report alone.**
+Shipping v0.6.0, a release subagent hit an API spend limit mid-publish, right
+after announcing its next step but before touching any file. Re-verifying
+version/HEAD/tags/GitHub-release state directly from the repo (not trusting the
+agent's own account of what it had done) confirmed nothing was half-done before
+retrying — do this every time a release step is resumed, not just when something
+looks wrong.
+
+**`gh release create` can reject a long heredoc `--notes` body** (sandbox
+classifier). Fall back to a minimal `create`, then `gh release edit --notes`
+with the full text.
 
 ## Out of scope (through v0.3.0)
 
