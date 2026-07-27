@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from . import git
+from . import confinement, git
 from .graph import Graph, default_graph_path
 from .model import Confidence, EdgeType, NodeType, feature_id, file_id
 
@@ -23,6 +23,11 @@ class GraphNotBuiltError(Exception):
 
 
 def load_graph(repo_root: str | Path) -> Graph:
+    # Confinement is checked but its resolved path is not used below — the
+    # not-built message stays built from the *original* argument, so the
+    # documented default repo="." keeps its existing relative-path message
+    # byte-for-byte (AC-1.8).
+    confinement.ensure_repo(repo_root)
     path = default_graph_path(repo_root)
     if not path.exists():
         raise GraphNotBuiltError(
@@ -204,6 +209,7 @@ def impact_diff(graph: Graph, repo_root: str | Path, diff_range: str) -> dict:
     """Blast radius of a git change range: resolve the range to a file list and
     feed the existing `impact` engine (so the answer equals passing the files
     explicitly — AC-3.1)."""
+    confinement.ensure_repo(repo_root)  # AC-1.9: refuses direct library calls too
     files, err = git.diff_files(repo_root, diff_range)
     if err is not None:
         return {"found": False, "reason": "bad_range", "range": diff_range, "message": err}
@@ -238,9 +244,13 @@ def _normalise_path(raw: str) -> str:
 def staleness(graph: Graph, repo_root: str | Path) -> dict:
     """Compare each File node's stored hash to the file on disk, so a consumer
     never acts on an answer from a graph that no longer matches the repo."""
+    confinement.ensure_repo(repo_root)  # AC-1.9: refuses direct library calls too
     root = Path(repo_root)
     changed, missing = [], []
-    file_nodes = graph.nodes(NodeType.FILE)
+    # Size-skipped File nodes (AC-3.2) carry no hash — nothing to compare, so
+    # they are neither changed nor missing (inert today: every other File
+    # node already has a hash).
+    file_nodes = [n for n in graph.nodes(NodeType.FILE) if n.get("hash") is not None]
     for node in file_nodes:
         rel = node["id"][len("file:"):]
         path = root / rel

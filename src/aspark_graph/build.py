@@ -16,7 +16,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from . import artifacts, extractors, inference, parse_cache
+from . import artifacts, confinement, extractors, inference, parse_cache
 from .extractors.base import FileExtraction, language_for
 from .graph import Graph, default_graph_path
 from .model import (
@@ -43,6 +43,7 @@ class BuildReport:
     artifact_entities: int = 0
     inferred_edges: int = 0
     unparsed: list[str] = field(default_factory=list)
+    size_skipped: int = 0  # AC-3.2: files over MAX_FILE_BYTES, recorded but never read
     # Incremental-build accounting (T1+):
     incremental: bool = False     # True when the cache was used for this build
     reparsed: int = 0             # files that went through the extractor
@@ -55,6 +56,8 @@ class BuildReport:
             line += f", {self.inferred_edges} inferred link(s)"
         if self.unparsed:
             line += f", {len(self.unparsed)} file(s) unparsed"
+        if self.size_skipped:
+            line += f", {self.size_skipped} file(s) skipped (over size limit)"
         if self.incremental:
             line += f"; incremental: {self.reparsed} re-parsed, {self.cached} cached"
         else:
@@ -69,7 +72,7 @@ def build_graph(repo_root: str | Path, *, full: bool = False) -> tuple[Graph, Bu
     When full=False (the default), reuse cached FileExtraction objects for
     unchanged files; fall back to a full rescan if the cache is unusable.
     """
-    repo_root = Path(repo_root).resolve()
+    repo_root = confinement.ensure_repo(repo_root)
     graph = Graph()
     report = BuildReport()
 
@@ -93,6 +96,19 @@ def build_graph(repo_root: str | Path, *, full: bool = False) -> tuple[Graph, Bu
         language = language_for(relpath)
         if language is None:
             continue
+
+        size = path.stat().st_size
+        if size > confinement.MAX_FILE_BYTES:
+            # AC-3.2: contents never read into memory; no hash, so this node
+            # carries no comparable state (queries.staleness skips it).
+            graph.add_node(
+                file_id(relpath), NodeType.FILE, language=language,
+                unparsed=True, unparsed_reason="size", size_bytes=size,
+            )
+            report.unparsed.append(relpath)
+            report.size_skipped += 1
+            continue
+
         source = path.read_bytes()
         digest = hashlib.sha256(source).hexdigest()[:16]
 
@@ -137,7 +153,15 @@ def build_graph(repo_root: str | Path, *, full: bool = False) -> tuple[Graph, Bu
 
 
 def _iter_source_files(repo_root: Path):
-    for path in sorted(repo_root.rglob("*")):
+    # Bounded collection (AC-3.1): count while consuming rglob's iterator so
+    # an oversized/cyclic tree is refused before sorted() would have to
+    # exhaust it. Runs before any parsing — no partial graph can exist.
+    entries = []
+    for count, path in enumerate(repo_root.rglob("*"), start=1):
+        entries.append(path)
+        confinement.check_entry_count(count, repo_root)
+
+    for path in sorted(entries):
         if not path.is_file():
             continue
         rel_parts = path.relative_to(repo_root).parts

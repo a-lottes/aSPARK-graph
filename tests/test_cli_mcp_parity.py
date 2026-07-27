@@ -3,12 +3,18 @@
 AC-5.1: for the same inputs the CLI and the MCP tool return the same answer —
 asserted by driving both adapters over the shared query functions.
 AC-5.2: a query before any build gives a clear 'build first' message, no trace.
+
+security-posture AC-1.7/AC-1.8: the same table now carries confinement
+refusal rows alongside accepted ones (no second parity test), plus the
+default repo="." regression.
 """
 
 import json
 from pathlib import Path
 
-from aspark_graph import cli, queries, server
+import pytest
+
+from aspark_graph import cli, confinement, queries, server
 from aspark_graph.build import build_graph
 
 SAMPLE_REPO = Path(__file__).parent / "fixtures" / "sample_repo"
@@ -72,3 +78,79 @@ def test_ac_5_2_query_before_build_is_a_clear_message(tmp_path, capsys):
     assert rc == 1
     assert "build" in err.lower()
     assert "Traceback" not in err  # no stack trace leaked to the user
+
+
+# --- AC-1.7: one fixed table, accepted and refused rows, CLI == MCP verdict -
+
+
+def _confinement_rows(tmp_path):
+    """(path, accepted) — three accepted marker shapes, three refused shapes."""
+    marked_git_dir = tmp_path / "marked-git-dir"
+    marked_git_dir.mkdir()
+    (marked_git_dir / ".git").mkdir()
+
+    marked_git_file = tmp_path / "marked-git-file"
+    marked_git_file.mkdir()
+    (marked_git_file / ".git").write_text("gitdir: ../elsewhere/.git\n")
+
+    graph_only = tmp_path / "graph-only"
+    graph_only.mkdir()
+    (graph_only / ".aspark-graph").mkdir()
+    (graph_only / ".aspark-graph" / "graph.json").write_text(json.dumps({"nodes": [], "edges": []}))
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+
+    missing = tmp_path / "does-not-exist"
+
+    regular_file = tmp_path / "regular.txt"
+    regular_file.write_text("x")
+
+    return [
+        (marked_git_dir, True),
+        (marked_git_file, True),
+        (graph_only, True),
+        (empty, False),
+        (missing, False),
+        (regular_file, False),
+    ]
+
+
+@pytest.mark.parametrize("row", range(6))
+def test_ac_1_7_confinement_verdict_is_identical_cli_vs_mcp(tmp_path, capsys, row):
+    path, accepted = _confinement_rows(tmp_path)[row]
+
+    rc = cli.main(["build", str(path)])
+    cli_err = capsys.readouterr().err
+    cli_accepted = rc == 0
+
+    mcp_out = server.build_graph(path=str(path))
+    mcp_accepted = mcp_out.get("reason") != "outside_confinement"
+
+    assert cli_accepted == accepted, f"CLI verdict wrong for {path}: rc={rc}, err={cli_err!r}"
+    assert mcp_accepted == accepted, f"MCP verdict wrong for {path}: {mcp_out!r}"
+    assert cli_accepted == mcp_accepted  # the actual parity assertion
+
+
+# --- AC-1.8: default repo="." keeps working, byte-for-byte -----------------
+
+
+def test_ac_1_8_default_repo_dot_message_stays_relative(tmp_path, monkeypatch):
+    # A marked-but-unbuilt cwd must still produce the exact pre-confinement
+    # relative message — resolving "." to an absolute path would change it.
+    (tmp_path / ".git").mkdir()
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(queries.GraphNotBuiltError) as exc_info:
+        queries.load_graph(".")
+    assert str(exc_info.value) == (
+        "No graph found at .aspark-graph/graph.json. Run 'aspark-graph build' first."
+    )
+
+
+def test_ac_1_8_default_repo_accepted_from_a_real_checkout(monkeypatch):
+    # The documented install runs with cwd = the aspark-graph checkout, which
+    # is itself .git-marked — the default repo="." must not be refused.
+    checkout_root = Path(__file__).resolve().parents[1]
+    assert (checkout_root / ".git").exists()
+    monkeypatch.chdir(checkout_root)
+    assert confinement.ensure_repo(".") == checkout_root.resolve()

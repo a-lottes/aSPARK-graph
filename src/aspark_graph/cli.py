@@ -12,7 +12,7 @@ import argparse
 import json
 import sys
 
-from . import artifacts, queries
+from . import artifacts, confinement, queries
 from .build import build_graph
 from .graph import default_graph_path
 
@@ -164,6 +164,9 @@ _QUERY_NAMES = list(_QUERY_ARGS)
 def _cmd_build(args) -> int:
     try:
         graph, report = build_graph(args.path, full=args.full)
+    except confinement.RepoRefused as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     except artifacts.TemplateDriftError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -186,6 +189,9 @@ def _cmd_serve() -> int:
 def _cmd_query(args) -> int:
     try:
         graph = queries.load_graph(args.repo)
+    except confinement.RepoRefused as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     except queries.GraphNotBuiltError as exc:
         print(str(exc), file=sys.stderr)
         return 1

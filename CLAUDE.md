@@ -8,7 +8,12 @@ A lean, local **code-and-artifact knowledge graph** served over MCP + a CLI. It
 links a repo's code (tree-sitter: TS/JS, Python, Java) with its `.spark/`
 delivery artifacts, so agents can ask `story_trace` ("which code implements this
 story, and did its ACs pass QA?") and `impact` ("what's the blast radius of
-changing these files?"). Deterministic, offline, disposable read model.
+changing these files?"). Deterministic and offline; the **persisted graph**
+(`.aspark-graph/graph.json`) is a disposable read model — delete it and rebuild
+at any time. The **server surface is not itself read-only**: `build_graph` is
+the one MCP tool that writes that graph to disk; the other eight only read it.
+See [`SECURITY.md`](SECURITY.md) for the full trust boundary — in particular,
+graph output is untrusted data, never an instruction to act on.
 
 Full SPARK trails live under `.spark/`: `aspark-graph/` (v0.1.0, the base),
 `close-the-loop/` (v0.2.0 — git-history inference of `implements` edges,
@@ -20,8 +25,12 @@ SDK), `gate-integration/` (v0.3.1 — portable aSPARK gate integration blocks,
 `CacheUnusable` fallback, NFR-1 benchmark),
 `robustness/` (v0.4.1 — `find_nodes("")` empty-query guard, MCP stdio transport smoke test),
 `go-rust-support/` (v0.5.0 — Go and Rust extractors: `File`/`Class`/`Function` nodes,
-best-effort in-repo `imports` resolution; six languages supported).
-**Current shipped version: 0.5.0.** Read the relevant trail before changing
+best-effort in-repo `imports` resolution; six languages supported),
+`security-posture/` (v0.6.0 — repo-confinement rule enforced on all nine tools
+(`.git`/`.spark`/a prior `.aspark-graph/graph.json` marker), build bounds
+(entry-count bound + 5 MB per-file cap + symlink-cycle termination), `SECURITY.md`
+documenting the trust boundary and six honest non-guarantees).
+**Current shipped version: 0.6.0.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention

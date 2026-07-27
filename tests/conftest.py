@@ -14,6 +14,18 @@ SAMPLE_REPO = FIXTURES / "sample_repo"
 _FIXED_DATE = "2026-01-01T00:00:00"
 
 
+@pytest.fixture(autouse=True)
+def _tmp_path_is_confined(tmp_path):
+    """security-posture US-1: every `tmp_path` marks itself as a repo, so the
+    confinement rule in confinement.py stays enforced (no test-only bypass —
+    see the plan's R1) rather than the whole suite running through a hole in
+    it. An empty `.spark/` is graph-neutral (verified: yields a byte-identical
+    graph to none at all — artifacts.extract_features returns 0 for it), so no
+    existing test's counts or assertions change. A test that genuinely needs
+    an *unmarked* directory builds its own subdirectory under `tmp_path`."""
+    (tmp_path / ".spark").mkdir(exist_ok=True)
+
+
 @pytest.fixture
 def sample_repo() -> Path:
     return SAMPLE_REPO

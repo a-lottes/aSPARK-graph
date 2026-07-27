@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from . import queries
+from . import confinement, queries
 from .build import build_graph as _build_graph
 
 mcp = FastMCP("aspark-graph")
@@ -20,8 +20,12 @@ mcp = FastMCP("aspark-graph")
 
 @mcp.tool()
 def build_graph(path: str = ".") -> dict:
-    """(Re)scan a repository and its .spark/ artifacts and persist the graph."""
-    graph, report = _build_graph(path)
+    """(Re)scan a repository and its .spark/ artifacts and persist the graph.
+    Writes <path>/.aspark-graph/ — this is the one MCP tool that writes."""
+    try:
+        graph, report = _build_graph(path)
+    except confinement.RepoRefused as exc:
+        return {"found": False, "reason": exc.reason, "message": str(exc)}
     out_path = graph.save(queries.default_graph_path(path))
     return {
         "code_entities": report.code_entities,
@@ -33,13 +37,16 @@ def build_graph(path: str = ".") -> dict:
 
 
 def _open(repo: str):
-    """Load the graph, or return a clean 'build first' error dict — parity with
-    the CLI's AC-5.2 message so a query-before-build never raises a raw error to
-    the MCP client (F3). Returns (graph, None) or (None, error_dict)."""
+    """Load the graph, or return a clean error dict — parity with the CLI so a
+    query-before-build (F3) or a target outside confinement (security-posture
+    US-1) never raises a raw error to the MCP client. Returns (graph, None) or
+    (None, error_dict)."""
     try:
         return queries.load_graph(repo), None
     except queries.GraphNotBuiltError as exc:
         return None, {"found": False, "error": str(exc)}
+    except confinement.RepoRefused as exc:
+        return None, {"found": False, "reason": exc.reason, "message": str(exc)}
 
 
 @mcp.tool()

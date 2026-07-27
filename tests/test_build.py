@@ -25,9 +25,15 @@ def test_build_reports_both_counts(tmp_path):  # AC-1.1
 
 
 def test_no_spark_builds_code_only(tmp_path):  # AC-1.4
-    _write_code_repo(tmp_path)
-    assert not (tmp_path / ".spark").exists()
-    graph, report = build_graph(tmp_path)
+    # tmp_path itself is auto-marked with an empty .spark/ (conftest.py,
+    # security-posture US-1); this test needs a repo genuinely without one, so
+    # it builds its own .git-marked subdirectory instead.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".git").mkdir()
+    _write_code_repo(repo)
+    assert not (repo / ".spark").exists()
+    graph, report = build_graph(repo)
     assert report.artifact_entities == 0
     assert graph.counts()["artifact"] == 0
     assert report.code_entities > 0  # code still present, no error raised

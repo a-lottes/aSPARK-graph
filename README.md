@@ -60,6 +60,10 @@ and orphan detection possible at all.
 `CLAUDE.md` blocks that wire the `/peer-review` and `/demo-day` gates to the
 query tools.
 
+**Trust boundary, non-guarantees, and how to report a vulnerability:** see
+[`SECURITY.md`](SECURITY.md) — read it before treating this server's output
+as anything other than data.
+
 ---
 
 ## The graph model (read this to interpret any result)
@@ -194,10 +198,13 @@ aspark-graph query shortest_path "task:my-feature:T1" "ac:my-feature:AC-1.1"
 
 ### MCP
 
-The same operations are exposed as MCP tools: `build_graph`, `story_trace`,
-`impact`, `gate_health`, `staleness`, `get_node`, `find_nodes`, `get_neighbors`,
-`shortest_path`. Querying before a build (or any domain error) returns a clean
-`{"found": false, ...}`-shaped result — never a raw traceback.
+The same operations are exposed as MCP tools: `story_trace`, `impact`,
+`gate_health`, `staleness`, `get_node`, `find_nodes`, `get_neighbors`,
+`shortest_path` — all eight **read-only**, plus `build_graph`, the **one tool
+that writes** (`<target>/.aspark-graph/graph.json` and `parse-cache.json`).
+Querying before a build (or any domain error) returns a clean
+`{"found": false, ...}`-shaped result — never a raw traceback. See
+[`SECURITY.md`](SECURITY.md) for the full trust boundary.
 
 ## Linking code to stories
 
