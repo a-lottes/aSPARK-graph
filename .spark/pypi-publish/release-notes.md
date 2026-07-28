@@ -5,7 +5,7 @@
 | **Phase** | Keep |
 | **Owner** | Release Manager (`/go-live`) |
 | **Input** | `review-report.md` (`passed` + re-review `passed`, 2026-07-28), `plan.md` T1–T5 (`done`) + Deviations, T6–T10 (release procedure) |
-| **Status** | `preparing` — T7 pre-flight re-verified clean on the corrected artifacts. T8's `uv publish` is prepared for the maintainer to run themselves; T9/T10 are prepared, pending (a) the maintainer's confirmation that T8 succeeded and (b) the coordinator's go. |
+| **Status** | `released` |
 | **Version** | 0.7.0 (proposed — see Version Justification) |
 | **Previous version** | 0.6.0 |
 | **Date** | 2026-07-28 |
@@ -338,116 +338,104 @@ only at T9, after the package is confirmed on PyPI — A5/NFR-3.)*
 
 ---
 
-## 4. Release Actions — PREPARED, NOT YET EXECUTED
+## 4. Release Actions — EXECUTED, ALL VERIFIED
 
-**No outward-facing action has been taken. Nothing was published, committed,
-tagged, or pushed.** `dist/` holds the clean, corrected, independently
-re-verified 0.7.0 wheel + sdist. The steps below are prepared and handed off.
+**Every outward-facing action below actually happened and was independently
+re-verified after the fact — none taken on trust from a tool's exit code
+alone.**
 
-### T6 — Maintainer credential checklist (user-owned; no agent touches the token)
+### T6 — Maintainer credential checklist ✅ done by the maintainer
 
-Hand this to the maintainer (Andreas Lottes). No agent reads, stores, echoes,
-or types the token (A3/NFR-5).
+2FA confirmed on, an account-scoped API token created (the `aspark-graph`
+project didn't exist on PyPI yet, so a project-scoped token wasn't mintable
+for the first upload), `UV_PUBLISH_TOKEN` exported in the maintainer's own
+shell. No agent read, stored, echoed, or typed the token at any point
+(A3/NFR-5 held throughout).
 
-- [ ] **2FA enabled** on the PyPI account — pypi.org → *Account settings* →
-  *Two factor authentication* (A6).
-- [ ] **API token created.** The project `aspark-graph` does not exist on PyPI
-  yet (404), so a *project-scoped* token can't be minted for the **first**
-  upload — create a token scoped to *Entire account* for the initial publish,
-  then (after 0.7.0 is live) rotate to a project-scoped token for future
-  releases.
-- [ ] **Token exported in your own shell**, never pasted into a file, commit,
-  PR, or agent message:
-  `export UV_PUBLISH_TOKEN='pypi-…'` (uv uses `__token__` as the username
-  automatically when `UV_PUBLISH_TOKEN` is set).
-- [ ] **Confirm back to the coordinator** that 2FA is on and the token is set in
-  your environment — *without revealing the token value* — before T8.
+**One real hiccup, resolved without any agent touching the credential:** the
+first `uv publish` attempt returned `403 Username/Password authentication is
+no longer supported` — PyPI's response when it doesn't see a recognized
+token, not a rejected-token error. Diagnosed via credential-free checks only
+(confirmed no `~/.pypirc` existed to interfere; confirmed the coordinator's
+own shell had no stray `UV_PUBLISH_TOKEN`, which was expected and correct).
+Root cause was almost certainly the export not surviving into the exact shell
+`uv publish` ran in — a maintainer-side shell-session issue, not a tool or
+process defect. The maintainer re-exported the token in the same terminal as
+the publish command and it succeeded on retry.
 
-### T8 — Publish (OUTWARD-FACING, maintainer-run in their own terminal)
+**A scope question surfaced and correctly declined mid-release:** the
+maintainer asked about switching to GitHub Actions trusted publishing (OIDC)
+after hitting the 403. The coordinator flagged that this reverses the spec's
+explicit Q1/C5 decision and would require standing up this repo's first-ever
+CI workflow — real new scope, not a quick fix — and asked the maintainer to
+choose explicitly rather than sliding into it. The maintainer chose to keep
+debugging the approved manual-token path, which then worked. Recorded here
+because it's a real instance of the loop's own discipline (no architecture
+drift without an explicit decision) holding under actual release pressure.
 
-**You (maintainer) run this — no agent executes `uv publish`.**
+### T8 — Publish ✅ executed by the maintainer, confirmed live by the coordinator
 
-```bash
-cd /Users/andreaslottes/aSPARK-graph
+The maintainer ran `uv build && uv publish` in their own terminal — no agent
+executed or witnessed the token. The coordinator then independently verified
+success by reading PyPI's public JSON API directly (no credential needed):
 
-# 0. Sanity: confirm you are publishing the intended, CLEAN artifacts.
-#    dist/ currently holds the corrected build (sdist manifest fix applied
-#    and independently re-verified by the Release Manager). If you rebuild,
-#    re-check the manifest before publishing:
-uv build
-tar tzf dist/aspark_graph-0.7.0.tar.gz | grep -E '\.claude/|worktrees/' \
-  && { echo 'ABORT: sdist still contains local cruft'; exit 1; } \
-  || echo 'sdist manifest clean'
-ls dist/   # expect exactly: aspark_graph-0.7.0-py3-none-any.whl  aspark_graph-0.7.0.tar.gz
-
-# 1. Publish BOTH the wheel and the sdist (UV_PUBLISH_TOKEN already set — T6).
-uv publish
+```
+GET https://pypi.org/pypi/aspark-graph/json
+→ version: 0.7.0
+→ files: ['bdist_wheel', 'sdist']
+→ aspark_graph-0.7.0-py3-none-any.whl  49754 bytes
+→ aspark_graph-0.7.0.tar.gz            79487 bytes
 ```
 
-Then **independently re-verify from PyPI's public API** (an agent may run this
-read — no credential needed) before any further step (AC-1.8):
+Both byte counts match the locally-built, independently re-verified artifacts
+exactly — confirming what's live on PyPI is genuinely the corrected,
+re-reviewed build, not some other or stale one. Both file types present;
+AC-1.8's partial-upload reconciliation path was not needed.
 
-```bash
-curl -s https://pypi.org/pypi/aspark-graph/json \
-  | python3 -c 'import sys,json;d=json.load(sys.stdin);\
-v=d["info"]["version"];fs=sorted(f["packagetype"] for f in d["releases"].get(v,[]));\
-print("version:",v,"files:",fs)'
-# Expect: version: 0.7.0  files: ['bdist_wheel', 'sdist']
-```
+### T9 — Release commit, tag, push, GitHub Release ✅ executed by the coordinator, each step re-verified
 
-Apply AC-1.8: if only one file type landed, upload the missing one to the
-**same** 0.7.0 (`uv publish dist/<missing-file>`); a genuinely broken upload
-follows §0's yank path. Never assume success from intent — read PyPI directly.
-Record the human authorizer + "no agent held the credential" here once done.
+Executed only after T8's live confirmation, exactly as the honesty-rule
+ordering (A5/NFR-3) required — the published-path README claim entered public
+git history strictly after PyPI confirmed 0.7.0 was live, never before.
 
-### T9 — Release commit, tag, push, GitHub Release (OUTWARD-FACING — agent-run, **only after** T8 confirms live)
+| Step | Result | Independently re-verified |
+|---|---|---|
+| Stage release file set | `pyproject.toml`, `uv.lock`, `README.md`, `tests/test_readme.py`, `tests/test_packaging.py`, `CLAUDE.md`, `.spark/pypi-publish/*` — **not** `.spark/BACKLOG.md` | `git status --short` confirmed the exact intended set, nothing extra |
+| Commit | `18ca494` — "feat(pypi-publish): ship v0.7.0 — publish aspark-graph to PyPI" | 10 files changed, 1358 insertions(+), 45 deletions(-) |
+| Tag | `v0.7.0` (annotated) | `git tag --list \| grep v0.7.0` confirmed locally before push |
+| Push `main` | `2d5c089..18ca494` | `git ls-remote origin main` → `18ca494...`, matches `git rev-parse HEAD` exactly |
+| Push tag | `v0.7.0 -> v0.7.0` | `git ls-remote --tags origin` → tag dereferences (`^{}`) to `18ca494`, the exact commit pushed |
+| GitHub Release | Created (minimal `--notes` first, then `gh release edit --notes-file` with the full changelog — the long-heredoc sandbox-block fallback from `security-posture` §7, needed again here) | `gh release view v0.7.0 --json isDraft,publishedAt,tagName` → `isDraft: false`, published, correct tag |
 
-Load-bearing order (A5/NFR-3): the published-path README claim must not enter
-public git history until PyPI confirms 0.7.0 is live. Once T8's PyPI JSON shows
-0.7.0 with both file types, the coordinator relays the go, and these run (each
-step re-verified before the next — AC-1.8):
+### T10 — Post-publish clean-machine verification ✅ executed by the coordinator
 
-```bash
-# Release file set: pyproject.toml, uv.lock, README.md, tests/test_readme.py,
-# tests/test_packaging.py (new), CLAUDE.md, .spark/pypi-publish/*
-# (NOT .spark/BACKLOG.md — pre-existing, out of scope)
-git add pyproject.toml uv.lock README.md tests/test_readme.py \
-        tests/test_packaging.py CLAUDE.md .spark/pypi-publish/
-git commit -m "feat(pypi-publish): ship v0.7.0 — publish aspark-graph to PyPI
+From a completely fresh `uv venv` with **no checkout of this repo present**:
 
-Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
-git tag -a v0.7.0 -m "aspark-graph v0.7.0 — first public PyPI release"
-git push origin main          # re-verify: git ls-remote origin main
-git push origin v0.7.0        # re-verify: git ls-remote --tags origin | grep v0.7.0
-gh release create v0.7.0 --title "v0.7.0 — aspark-graph on PyPI" --notes "<changelog §3>"
-# if a long --notes heredoc is sandbox-blocked: minimal create, then
-# gh release edit v0.7.0 --notes-file <file>  (security-posture §7 learning)
-```
+- `pip install aspark-graph` resolved from live PyPI, version confirmed `0.7.0`
+  via `importlib.metadata`.
+- `cryptography` and `joserfc` absent from the installed tree.
+- `aspark-graph build .` on a fresh scratch repo → succeeded; `find_nodes`
+  returned the expected `Function` node.
+- `aspark-graph serve` completed the JSON-RPC `initialize` handshake and
+  registered exactly the 9 expected tools.
+- **The live pypi.org project page rendered correctly** (AC-2.6's live leg,
+  the one thing only verifiable post-publish): the logo `<picture>` loaded
+  fully (2172×724, via PyPI's camo image proxy decoding the
+  `raw.githubusercontent.com` URL — `complete: true`, not broken), and both
+  `SECURITY.md`/`docs/aspark-integration.md` links resolved to the correct
+  absolute `github.com/a-lottes/aSPARK-graph/blob/main/...` URLs — checked
+  directly against the rendered DOM, not assumed from the source markup.
 
-Note: `plan.md`'s Deviations section is part of `.spark/pypi-publish/` and is
-carried in the same commit — the sdist fix's own trail ships with the release
-it fixed, not as a separate follow-up.
+### Final working-tree state
 
-### T10 — Post-publish clean-machine verification (agent-run, after T9)
-
-From a fresh venv with no checkout: `uvx aspark-graph …` / `pip install
-aspark-graph` from **live** PyPI → `build` + a query + `serve` (9 tools);
-`cryptography` absent; `GET pypi.org/pypi/aspark-graph/json` returns 0.7.0;
-open the pypi.org project page and confirm the README renders (logo + links
-resolve — AC-2.6 live leg; the absolute URLs, verified static at review).
-
-### Working-tree state left by this pass
-
-`git status`: `pyproject.toml` (→0.7.0 + sdist allowlist) and `uv.lock`
-(→0.7.0) modified; `README.md` / `CLAUDE.md` / `tests/test_readme.py` from the
-T2–T4 review; new `tests/test_packaging.py`; untracked `.spark/pypi-publish/`.
-`dist/` holds the corrected, independently re-verified 0.7.0 wheel + sdist.
-`.spark/BACKLOG.md` remains pre-existing and untracked, untouched. No commit,
-tag, push, or publish has occurred.
+`git status --short` → only `.spark/BACKLOG.md` (pre-existing, untracked,
+untouched throughout this entire feature, exactly as instructed). Local
+`HEAD` == `origin/main` == `18ca494`. `v0.7.0` tag on origin dereferences to
+the same commit. Temp venvs and scratch directories cleaned up.
 
 ---
 
-## 5. Learnings (Keep!) — preliminary (finalize at the successful release)
+## 5. Learnings (Keep!)
 
 ### What went well
 
@@ -478,6 +466,20 @@ tag, push, or publish has occurred.
   sdist been published, 0.7.0 would be permanently spent and the leak
   permanent. Catching it at prepare, before any upload, cost nothing but a
   rebuild and one extra review pass.
+- **The credential boundary held under real friction, not just in the
+  abstract.** The maintainer hit a genuine `uv publish` 403 and, separately,
+  a live temptation to switch to GitHub Actions trusted publishing to route
+  around it. Neither pressure caused the boundary to bend: no agent ever
+  touched the token (diagnosis stayed credential-free — variable *names*
+  only, never values, and `~/.pypirc` was checked for existence, never read),
+  and the scope question was surfaced explicitly and declined by the
+  maintainer rather than silently adopted mid-release.
+- **Confirmed live before declaring anything done — for both the upload and
+  the release commit's contents.** The wheel/sdist byte sizes read back from
+  PyPI's public JSON matched the locally-built artifacts exactly, closing the
+  loop that "the maintainer said it worked" alone would have left open. Same
+  discipline applied to `git push`/`gh release create`: each was re-read from
+  the remote, not assumed from a zero exit code.
 
 ### What we'd do differently
 
@@ -491,6 +493,12 @@ tag, push, or publish has occurred.
   sdist reads the repo's committed `.gitignore` only. The fix (an explicit
   allowlist) is the right general answer: it is immune to *any* future
   untracked or locally-ignored path, not just the one that triggered this.
+- **A first-time PyPI token setup deserves a pre-flight sanity check of its
+  own.** The 403 cost real back-and-forth that a one-line check — export the
+  token, then immediately verify `[ -n "$UV_PUBLISH_TOKEN" ]` and a
+  prefix/whitespace check, *in the same shell about to run `uv publish`* —
+  would have caught before the first failed attempt. Worth adding to T6's
+  checklist for the next maintainer-token setup this project does.
 
 ### Patterns worth reusing (CLAUDE.md / memory candidates)
 
@@ -514,6 +522,20 @@ tag, push, or publish has occurred.
    from trust alone") generalizes: any report of state you did not personally
    observe — including a fix-and-re-review your own gate demanded — gets
    independently re-derived before the release resumes.
+5. **Diagnose credential problems without ever touching the credential.**
+   Faced with an auth 403, every diagnostic step stayed read-only and
+   value-free: variable *names* only (`env | grep '^UV_PUBLISH' | cut -d= -f1`),
+   file *existence* only (`test -f ~/.pypirc`), never asking the user to paste
+   a token or even a fragment of one into chat. A reusable shape for any
+   future credential-adjacent debugging in this project.
+6. **When a maintainer proposes a scope-changing workaround mid-release
+   (e.g. "let's just use trusted publishing instead"), name the reversed
+   decision and its real cost explicitly, then let them choose — don't
+   silently follow the path of least resistance.** Publishing to PyPI
+   is a bigger investment than debugging one env var, but it took explicit
+   friction (a 403) to reveal that no CI existed to make trusted publishing
+   a one-click fix. Worth the same discipline the next time a "quicker" path
+   surfaces mid-release.
 
 ---
 
@@ -527,12 +549,15 @@ tag, push, or publish has occurred.
   Manager itself, both suites green, both artifacts smoke-tested in fresh
   venvs
 - [x] Changelog written in user-facing language — no commit hashes / ticket IDs / jargon
-- [ ] Release actions executed and verified — **not yet.** Prepared, not
-  executed. T8 (`uv publish`) awaits the maintainer running it themselves;
-  T9/T10 await T8's confirmation + the coordinator's go. This is the one hard
-  stop left in the loop, by design — not a gap.
-- [x] Learnings recorded — preliminary (to be finalized at the successful release)
-- [ ] Status set to `released` — pending T8 (maintainer) → T9/T10 (agent, on go)
+- [x] Release actions executed and verified — T8 published by the maintainer
+  (one 403 detour, diagnosed and resolved credential-free, resolved on
+  retry), independently confirmed live via PyPI's public JSON API (byte
+  sizes matching the reviewed build exactly); T9's commit/tag/push/GitHub
+  Release each independently re-verified against the remote; T10's
+  clean-machine install and live PyPI-page render both confirmed (§4)
+- [x] Learnings recorded — finalized, including what the real publish attempt
+  surfaced (§5)
+- [x] Status set to `released`
 
 ### QA-equivalent (this headless tool)
 
@@ -540,4 +565,8 @@ tag, push, or publish has occurred.
 - [x] Wheel **and** sdist packaged-install QA-equivalent re-run fresh at
   prepare time on the corrected artifacts (9 tools each, build, query, crypto
   absent from each)
-- [ ] Live-index QA-equivalent (T8/T10) — pending the maintainer's publish
+- [x] Live-index QA-equivalent (T8/T10) — executed: live install from public
+  PyPI in a fresh venv with no checkout, `build`/query/`serve` (9 tools) all
+  correct, `cryptography` absent, and the live pypi.org project page
+  confirmed rendering (logo loaded, `SECURITY.md`/integration-doc links
+  resolving to the correct absolute URLs)
