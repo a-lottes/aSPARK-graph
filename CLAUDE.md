@@ -29,8 +29,13 @@ best-effort in-repo `imports` resolution; six languages supported),
 `security-posture/` (v0.6.0 — repo-confinement rule enforced on all nine tools
 (`.git`/`.spark`/a prior `.aspark-graph/graph.json` marker), build bounds
 (entry-count bound + 5 MB per-file cap + symlink-cycle termination), `SECURITY.md`
-documenting the trust boundary and six honest non-guarantees).
-**Current shipped version: 0.6.0.** Read the relevant trail before changing
+documenting the trust boundary and six honest non-guarantees),
+`pypi-publish/` (v0.7.0 — first public PyPI release: `pip install aspark-graph`
+/ `uvx aspark-graph serve` replace install-from-source as the primary path;
+an explicit `[tool.hatch.build.targets.sdist]` allowlist in `pyproject.toml`
+keeps the published sdist to exactly `src/`, `tests/`, `README.md`, `LICENSE`,
+`pyproject.toml` — nothing untracked or locally git-ignored can reach it).
+**Current shipped version: 0.7.0.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention
@@ -60,7 +65,7 @@ each adapter. Never compute an answer in an adapter.
 
 - **Determinism (AC-1.2).** The graph must rebuild byte-for-byte on an unchanged
   repo. Persistence is canonical (sorted nodes/edges, `sort_keys`). Parse-
-  affecting deps (the three tree-sitter grammars + core) are pinned `==`;
+  affecting deps (the five tree-sitter grammars + core) are pinned `==`;
   `uv.lock` covers the rest. There is a byte-identical double-build test — keep it.
 - **Fail loudly on template drift (AC-1.3).** `artifacts.py` is pinned to a
   supported template shape and raises `TemplateDriftError` naming the file + the
@@ -112,6 +117,26 @@ each adapter. Never compute an answer in an adapter.
   self-consistent; a `git stash` round-trip (build a fixed fixture under the old
   code, then the new code, diff the two) is what actually proves a change didn't
   perturb an accepted repo's graph (v0.6.0's T13 regression sweep).
+- **The published sdist is an explicit `[tool.hatch.build.targets.sdist]`
+  `include` allowlist (v0.7.0), never gitignore subtraction.** hatchling's
+  sdist only reads the committed `.gitignore` — it is blind to anything ignored
+  via a *global* git excludes file or a repo-local, uncommitted
+  `.git/info/exclude`. A real build once carried `.claude/settings.local.json`
+  and a 50 MB agent-worktree directory into the sdist for exactly that reason.
+  `tests/test_packaging.py` builds a real sdist and asserts the actual tarball
+  manifest against the allowlist, naming forbidden paths explicitly — don't
+  widen the allowlist without updating that test's expectations too.
+- **Diagnose a credential problem without ever touching the credential**
+  (v0.7.0's PyPI-token 403). Check variable *names*, never values
+  (`env | grep '^UV_PUBLISH' | cut -d= -f1`); check file *existence*, never
+  contents (`test -f ~/.pypirc`); never ask the user to paste a token or a
+  fragment of one into chat, even for debugging.
+- **Independent re-verification applies to "a fix was made and re-reviewed,"
+  not only to "a session was interrupted."** Re-derive the evidence yourself
+  (rebuild, re-read the raw output, re-run the suite) before resuming a
+  release on anyone else's report — including your own gate's report on a fix
+  it just demanded (v0.7.0: the Release Manager re-verified the sdist fix
+  itself before resuming, rather than trusting the re-review's account of it).
 
 ## Using aspark-graph in /peer-review (this repo)
 
@@ -174,7 +199,7 @@ aspark-graph query gate_health aspark-graph
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
 uv run pytest                # 275 tests; keep green
-uv run pytest -m slow        # 2 slow tests: NFR-1 bench + MCP transport smoke
+uv run pytest -m slow        # 3 slow tests: NFR-1 bench, MCP transport smoke, sdist manifest
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .
 ```
