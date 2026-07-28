@@ -1,7 +1,7 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/aSPARK-graph-logo-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/aSPARK-graph-logo-light.png">
-  <img alt="aSPARK-graph logo" src="docs/aSPARK-graph-logo-light.png" width="480">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/a-lottes/aSPARK-graph/main/docs/aSPARK-graph-logo-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/a-lottes/aSPARK-graph/main/docs/aSPARK-graph-logo-light.png">
+  <img alt="aSPARK-graph logo" src="https://raw.githubusercontent.com/a-lottes/aSPARK-graph/main/docs/aSPARK-graph-logo-light.png" width="480">
 </picture>
 
 # 🕸️ aspark-graph
@@ -56,13 +56,13 @@ and orphan detection possible at all.
   for a code-search tool.
 
 **Using aspark-graph in aSPARK gates?** See
-[`docs/aspark-integration.md`](docs/aspark-integration.md) for drop-in
-`CLAUDE.md` blocks that wire the `/peer-review` and `/demo-day` gates to the
-query tools.
+[`docs/aspark-integration.md`](https://github.com/a-lottes/aSPARK-graph/blob/main/docs/aspark-integration.md)
+for drop-in `CLAUDE.md` blocks that wire the `/peer-review` and `/demo-day`
+gates to the query tools.
 
 **Trust boundary, non-guarantees, and how to report a vulnerability:** see
-[`SECURITY.md`](SECURITY.md) — read it before treating this server's output
-as anything other than data.
+[`SECURITY.md`](https://github.com/a-lottes/aSPARK-graph/blob/main/SECURITY.md)
+— read it before treating this server's output as anything other than data.
 
 ---
 
@@ -126,38 +126,35 @@ qa:<feature>:<ac>#<index>          e.g. qa:aspark-graph:AC-1.1#0
 
 ## Install
 
-Requires Python ≥ 3.11 and [uv](https://docs.astral.sh/uv/). aspark-graph is not
-yet published to a package index, so install it from a checkout of this
-repository:
+Requires Python ≥ 3.11. aspark-graph is published on
+[PyPI](https://pypi.org/project/aspark-graph/):
 
 ```bash
-git clone https://github.com/a-lottes/aSPARK-graph.git aspark-graph
-cd aspark-graph
-uv sync                       # installs into a local .venv
-uv run aspark-graph build .   # build the graph for the current repo
+pip install aspark-graph
+# or, with uv:
+uvx aspark-graph build .   # build the graph for the current repo, no install step
 ```
 
-Add it to Claude Code as an MCP server, pointing at your checkout:
+Add it to Claude Code as an MCP server:
 
 ```bash
-claude mcp add aspark-graph -- uv run --directory /path/to/aspark-graph aspark-graph serve
+claude mcp add aspark-graph -- uvx aspark-graph serve
 ```
 
-Until aspark-graph is published to a package index, the from-source path above is
-the supported install.
+Building from source (for contributors) is documented under
+[Development](#development) below.
 
 ## Update
 
 ```bash
-cd /path/to/aspark-graph
-git pull
-uv sync
-uv run aspark-graph build /path/to/your/repo   # rebuild after update
+pip install --upgrade aspark-graph
+# or, with uvx, the latest published version always runs — no separate update step
 ```
 
-The graph is not forwards-compatible across versions: always rebuild after `git pull`.
-Incremental builds (v0.4.0+) make this fast — only changed files are re-parsed, so a
-routine update rebuild takes seconds on most repos.
+The graph is not forwards-compatible across versions: always rebuild after
+updating (`aspark-graph build .`). Incremental builds (v0.4.0+) make this fast —
+only changed files are re-parsed, so a routine update rebuild takes seconds on
+most repos.
 
 ## Build the graph
 
@@ -204,7 +201,8 @@ The same operations are exposed as MCP tools: `story_trace`, `impact`,
 that writes** (`<target>/.aspark-graph/graph.json` and `parse-cache.json`).
 Querying before a build (or any domain error) returns a clean
 `{"found": false, ...}`-shaped result — never a raw traceback. See
-[`SECURITY.md`](SECURITY.md) for the full trust boundary.
+[`SECURITY.md`](https://github.com/a-lottes/aSPARK-graph/blob/main/SECURITY.md)
+for the full trust boundary.
 
 ## Linking code to stories
 
@@ -239,7 +237,15 @@ fails on an unknown language.
 ## Design guarantees (why you can trust the output)
 
 - **Deterministic.** Byte-identical rebuild on an unchanged repo; parse-affecting
-  dependencies are pinned exactly; a double-build test enforces it.
+  dependencies are pinned exactly; a double-build test enforces it. The five
+  tree-sitter grammars (Python, TypeScript, Java, Go, Rust) and tree-sitter core
+  are pinned with `==`, and the committed `uv.lock` is part of the determinism
+  contract for the rest — a grammar version can change the node types it
+  extracts, so an unpinned grammar would silently break byte-identity.
+  **The guarantee's boundary:** byte-identical
+  rebuild holds for an unchanged repo on a **fixed** grammar set. A grammar bump
+  is a deliberate, changelog-documented, version-bumped event — never a silent
+  change to what a past build promised.
 - **Offline & LLM-free.** No network, no model calls — just AST parsing and
   artifact-template parsing.
 - **Fails loudly, never silently.** Template drift raises a named error; it never
@@ -258,10 +264,23 @@ support is Python, TypeScript/JavaScript, Java, Go, and Rust.
 
 ## Development
 
+Requires [uv](https://docs.astral.sh/uv/). Build and run from a checkout:
+
 ```bash
+git clone https://github.com/a-lottes/aSPARK-graph.git aspark-graph
+cd aspark-graph
 uv sync --extra dev
+uv run aspark-graph build .   # build the graph for the current repo
 uv run pytest
 ```
+
+Add a checkout to Claude Code as an MCP server:
+
+```bash
+claude mcp add aspark-graph -- uv run --directory /path/to/aspark-graph aspark-graph serve
+```
+
+To pick up upstream changes: `git pull && uv sync --extra dev`.
 
 The project **dogfoods itself**: its own `.spark/aspark-graph/` trail is the
 primary test fixture, so touching the parser or a query is checked against a real

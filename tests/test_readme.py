@@ -1,4 +1,7 @@
-"""T11: README documents only install paths that work today (US-6, AC-6.1/6.3)."""
+"""T11/pypi-publish T3: README documents only install paths that work today
+(US-6, AC-6.1/6.3; inverted for pypi-publish AC-2.3 once the package is
+published — see .spark/pypi-publish/spec.md).
+"""
 
 import re
 from pathlib import Path
@@ -13,25 +16,42 @@ def _install_section() -> str:
     return m.group(1)
 
 
+def _development_section() -> str:
+    # From the "## Development" heading to the next "## " heading (or EOF).
+    m = re.search(r"## Development\b(.*?)(?=\n## |\Z)", README, re.DOTALL)
+    assert m, "README has no Development section"
+    return m.group(1)
+
+
 def test_ac_6_1_no_fictional_package_index_command():
+    # pypi-publish AC-2.1/2.3: the package is live, so the published install
+    # commands must be present, not fictional.
     section = _install_section()
-    # No copy-pasteable uvx/pip/PyPI install command (the tool is unpublished).
-    assert "uvx aspark-graph" not in section
-    assert "pip install aspark-graph" not in section
+    assert "uvx aspark-graph" in section
+    assert "pip install aspark-graph" in section
 
 
 def test_ac_6_1_from_source_path_is_documented():
-    section = _install_section()
-    assert "uv sync" in section
-    assert "uv run aspark-graph build" in section
-    normalized = " ".join(section.lower().split())  # collapse line wraps
-    assert "not yet published" in normalized
+    # pypi-publish AC-2.3/2.5: "not yet published" is gone from the whole
+    # README, and the from-source path lives under Development, not Install.
+    normalized = " ".join(README.lower().split())  # collapse line wraps
+    assert "not yet published" not in normalized
+
+    dev_section = _development_section()
+    assert "uv sync" in dev_section
+    assert "uv run aspark-graph build" in dev_section
+
+    install_section = _install_section()
+    assert "uv sync" not in install_section
+    assert "git clone" not in install_section
 
 
 def test_ac_6_3_mcp_add_uses_working_entry_point():
+    # pypi-publish AC-2.2/2.3: the Install section's `claude mcp add` line
+    # uses the published `uvx` entry point, not the from-source `uv run
+    # --directory` form (which still lives, correctly, under Development).
     section = _install_section()
     assert "claude mcp add" in section
-    # The MCP-add command must use the working `uv run` form, not fictional uvx.
     mcp_line = next(line for line in section.splitlines() if "claude mcp add" in line)
-    assert "uv run" in mcp_line
-    assert "uvx" not in mcp_line
+    assert "uvx" in mcp_line
+    assert "uv run --directory" not in mcp_line

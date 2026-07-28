@@ -204,9 +204,10 @@ with the full text.
 ## Out of scope (through v0.3.0)
 
 More languages, an LLM/NL layer, precise call-graph resolution, incremental
-updates, a visualization UI, exports, HTTP/team mode, authenticated/remote MCP
-transport, and a live PyPI publish (deferred; the package is install-from-source
-only, so keep the README free of `uvx`/PyPI claims until it's actually published).
+updates, a visualization UI, exports, HTTP/team mode, and authenticated/remote
+MCP transport. **The package is published on PyPI** (`pypi-publish` —
+see `.spark/pypi-publish/`); the README documents the published install as
+primary, from-source as the contributor path.
 Tier-1 candidates (recorded during the builds): an explicit `files:` column in the
 aSPARK plan template (needs an aSPARK PR), SQLite/incremental builds, the whitespace-only
 query guard for `find_nodes` (C8 — the empty-string guard ships in v0.4.1; strip-and-check
