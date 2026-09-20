@@ -36,6 +36,16 @@ dependencies = [
     "tree-sitter-rust==0.24.2",
 ]
 
+# Without these, the PyPI page carries no link at all — anyone who finds the
+# package through PyPI search has no path back to the source, the docs or the
+# rest of the aSPARK family.
+[project.urls]
+Homepage = "https://aspark.lottes.dev"
+Source = "https://github.com/a-lottes/aSPARK-graph"
+Issues = "https://github.com/a-lottes/aSPARK-graph/issues"
+Changelog = "https://github.com/a-lottes/aSPARK-graph/releases"
+"aSPARK Core" = "https://github.com/a-lottes/aSPARK"
+
 [project.scripts]
 aspark-graph = "aspark_graph.cli:main"
 
