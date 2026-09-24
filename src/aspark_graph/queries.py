@@ -305,10 +305,20 @@ def gate_health(graph: Graph, feature: str) -> dict:
                 "severity": node.get("severity"), "location": node.get("location"),
             })
 
+    fnode = graph.get_node(fid)
+    coverage = (fnode or {}).get("coverage") or {}
+
     return {
         "found": True,
         "feature": name,
         "healthy": not (orphan_tasks or unverified_acs or open_findings),
+        "coverage": coverage,
+        # A clean verdict over a partial parse is not clean. Surface it.
+        "coverage_note": (
+            "verdict is over recognized artifacts only"
+            if coverage.get("skipped")
+            else None
+        ),
         "orphan_tasks": sorted(orphan_tasks, key=lambda t: t["id"]),
         "unverified_acs": sorted(unverified_acs, key=lambda a: a["id"]),
         "open_findings": sorted(open_findings, key=lambda f: f["id"]),
