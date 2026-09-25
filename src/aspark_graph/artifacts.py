@@ -98,12 +98,30 @@ def _parse_feature(feature_dir: Path, graph: Graph) -> int:
         statuses["release"] = _status(release)
         version = _release_version(release)
 
+    # Coverage statement (issue #61): a verdict is only honest over the files
+    # that actually parsed. Record what was seen, what was skipped, and what
+    # looked like an artifact but wasn't recognized (near-miss filenames).
+    recognized = [p.name for p in (spec, plan, review, qa, release) if p.exists()]
+    near_misses: list[str] = []
+    expected = {"spec.md", "plan.md", "review-report.md", "qa-report.md", "release-notes.md"}
+    for other in feature_dir.glob("*.md"):
+        if other.name in expected:
+            continue
+        stem = other.name.rsplit(".", 1)[0].lower().replace("_", "-")
+        if any(k in stem for k in ("spec", "plan", "review", "qa", "release")):
+            near_misses.append(other.name)
+
     # Stamp phase statuses onto the Feature node (feeds gate_health / a board).
     graph.add_node(
         fid, NodeType.FEATURE, name=feature,
         spec_status=statuses.get("spec"), plan_status=statuses.get("plan"),
         review_status=statuses.get("review"), qa_status=statuses.get("qa"),
         release_status=statuses.get("release"), version=version,
+        coverage={
+            "recognized": sorted(recognized),
+            "skipped": sorted(expected - set(recognized)),
+            "near_misses": sorted(near_misses),
+        },
     )
     return added
 
