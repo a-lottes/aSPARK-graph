@@ -130,11 +130,17 @@ def _parse_feature(feature_dir: Path, graph: Graph, shadowed: list[str] | None =
     # Coverage statement (issue #61): a verdict is only honest over the files
     # that actually parsed. Record what was seen, what was skipped, and what
     # looked like an artifact but wasn't recognized (near-miss filenames).
-    recognized = [p.name for p in (spec, plan, review, qa, release) if p.exists()]
+    resolved = {"spec": spec if spec.exists() else None, "plan": plan if plan.exists() else None}
+    resolved.update(zip((kind for kind, _, _ in _ARTIFACT_NAMES), (review, qa, release)))
+    # Coverage names each kind by its legacy spelling, whichever file was read, so a
+    # rename to the current names leaves the graph byte-identical (spec C2, C4).
+    legacy_name = {"spec": "spec.md", "plan": "plan.md", **{kind: legacy for kind, _, legacy in _ARTIFACT_NAMES}}
+    recognized = [legacy_name[kind] for kind, p in resolved.items() if p is not None]
+    skipped = [legacy_name[kind] for kind, p in resolved.items() if p is None]
+    known = {"spec.md", "plan.md"} | {name for _, current, legacy in _ARTIFACT_NAMES for name in (current, legacy)}
     near_misses: list[str] = []
-    expected = {"spec.md", "plan.md", "review-report.md", "qa-report.md", "release-notes.md"}
     for other in feature_dir.glob("*.md"):
-        if other.name in expected:
+        if other.name in known:
             continue
         stem = other.name.rsplit(".", 1)[0].lower().replace("_", "-")
         if any(k in stem for k in ("spec", "plan", "review", "qa", "release")):
@@ -148,7 +154,7 @@ def _parse_feature(feature_dir: Path, graph: Graph, shadowed: list[str] | None =
         release_status=statuses.get("release"), version=version,
         coverage={
             "recognized": sorted(recognized),
-            "skipped": sorted(expected - set(recognized)),
+            "skipped": sorted(skipped),
             "near_misses": sorted(near_misses),
         },
     )
