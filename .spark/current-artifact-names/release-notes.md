@@ -18,6 +18,15 @@
 
 ## 1. Pre-Flight Checks
 
+**Re-run on the repair commit `8b7a1b3` (fresh clone, 2026-09-26) — this certifies the release:**
+- [x] `review-report.md` and `qa-report.md` of `coverage-current-names` `passed` (review r2, QA r1); `current-artifact-names` review r2 / QA r2 `passed`
+- [x] `uv run --extra dev pytest`: 328 passed; `-m slow`: 3 passed
+- [x] `uv build`: `aspark_graph-0.7.1` wheel and sdist; sdist top level only `src`, `tests`, `README.md`, `LICENSE`, `pyproject.toml` plus hatch's `.gitignore` and `PKG-INFO`
+- [x] Version parity: `pyproject.toml` 0.7.1 == `uv.lock` 0.7.1
+- [x] Byte-identity vs the previous main `ad83eae` on this repo's own trail: `cmp` no difference (sha1 5f7785f0b6a3, 527113 bytes), stderr empty on both
+- [x] Core `e1a0005`: exit 0, QACheck pass 143 / unknown 11 / fail 11, Finding 170. steamcore `bf1b3e0`: exit 0, pass 251 / unknown 10, Finding 138
+- [x] No `review.md`, `qa.md` or `release.md` under this repo's `.spark/`
+
 > **Superseded (2026-09-26).** The checks below ran on `e57ce6d`, which merged next to PR #2 and crashed as `1b62da0`. They are kept as history and do **not** certify the release. Pre-flight is re-run on the repair commit (`coverage-current-names` T4); the byte-identity baseline is the previous main `ad83eae`, not v0.7.0 (C1).
 
 Run on `e57ce6d`, 2026-09-26, not copied from the reports.
@@ -99,7 +108,7 @@ Pending commands, in order, each needing the go:
 
 ## ✅ KEEP GATE
 
-- [ ] All pre-flight checks passed at release time — superseded; re-run on the repair commit (`coverage-current-names` T4)
+- [x] All pre-flight checks passed at release time — re-run on the repair commit `8b7a1b3` (§1, top block)
 - [x] Changelog written in user-facing language
 - [ ] Release actions executed and verified — prepared only; push, PR, publish, tag push and smoke check await the user's go
 - [x] Learnings recorded
