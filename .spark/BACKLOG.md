@@ -292,6 +292,41 @@ teilweise gespeicherte `graph.json`.
 Symlinks aus dem Repo heraus nicht folgen, `\|` in allen Artefakt-Tabellen.
 ```
 
+### G9 · `version-surface` — Version an einer Stelle lesbar machen
+
+**Priorität: Nach v0.7.1. Aufgenommen am 2026-09-26 (`/go-live` von `current-artifact-names`).**
+
+`src/aspark_graph/__init__.py` steht auf `__version__ = "0.1.0"` (nur `tests/test_smoke.py:7` prüft das), die CLI
+hat kein `--version`, und der MCP-`serverInfo` meldet die Version des MCP-SDK (1.19.0) statt der von aspark-graph
+(`FastMCP("aspark-graph")` ohne Version). Nichts davon ist eine Regression. Offen: `--version` ergänzen,
+`__version__` aus `importlib.metadata` ableiten, Server-Version setzen, Smoke-Test anpassen.
+
+```
+/spark version-surface — aspark-graph --version, __version__ aus den Paket-Metadaten, MCP-serverInfo mit der
+eigenen Version; Smoke-Test entsprechend.
+```
+
+### G10 · `coverage-hardening` — Befunde zum Coverage-Statement (PR #2)
+
+**Priorität: Nach v0.7.1. Aufgenommen am 2026-09-26 (Review von `coverage-current-names`, F6–F9, User-Entscheidung).**
+
+- **F6:** Die Beinahe-Treffer-Erkennung prüft nur Teilstrings: `explanation.md`, `perspective.md`, `inspection.md`
+  gelten als Beinahe-Treffer. Nur Rauschen, `coverage_note` ignoriert Beinahe-Treffer.
+- **F7:** Auf macOS wird `QA.md` als QA-Artefakt gelesen **und** als Beinahe-Treffer gemeldet; auf Linux wäre die
+  QA-Art „skipped" — der Graph hängt vom Betriebssystem ab. `glob("*.md")` erfasst auch Dotfiles und Verzeichnisse.
+- **F8:** Ein Graph von vor PR #2 liefert `coverage: {}` und `coverage_note: null`, das liest sich wie volle Abdeckung
+  bis zum nächsten Build.
+- **F9:** Kein CLI≡MCP-Paritätstest für `gate_health` mit den neuen Feldern (Parität gilt per Konstruktion).
+- **Aus C2/C4:** `skipped`/`recognized` nennen Arten in der alten Schreibweise; ein späterer Wechsel auf die aktuellen
+  Namen muss die Umbenennungs-Invarianz (v0.7.1 AC-5.3) erhalten.
+- `coverage_note` erscheint bei jedem Feature ohne Release Notes (also mitten im Zyklus) — so gewollt (User,
+  2026-09-26); bei Bedarf feinjustieren.
+
+```
+/spark coverage-hardening — Beinahe-Treffer nur bei Namens-Nähe statt Teilstring, Groß-/Kleinschreibung
+betriebssystemunabhängig, alte Graphen ohne coverage als „unbekannt" melden, gate_health-Paritätstest.
+```
+
 ---
 
 ## 4. Bewusst nicht in diesem Backlog
