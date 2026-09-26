@@ -5,14 +5,14 @@
 | **Phase** | Keep |
 | **Owner** | Release Manager (`/go-live`) |
 | **Input** | `review-report.md` (`passed`, round 2), `qa-report.md` (`passed`, round 2) — legacy names on purpose (plan R2) |
-| **Status** | `preparing` |
+| **Status** | `released` |
 | **Version** | v0.7.1 (patch, user ruling 2026-09-26: all changes additive — MCP key `ignored_legacy_files`; `coverage` on every Feature node; `coverage` and `coverage_note` in `gate_health`) |
 | **Date** | 2026-09-26 |
 
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status` and `Version`).
-- **Summary:** aspark-graph v0.7.1 reads Core's current artifact names; PR #3 merged (crashed next to PR #2, repaired by `coverage-current-names`); nothing published or tagged remotely.
-- **Open:** `1 outstanding` — publish (§3) waits for the user's explicit go; the PyPI upload is run by the maintainer, no agent holds a credential.
+- **Summary:** aspark-graph v0.7.1 released 2026-09-26: PyPI 0.7.1 (wheel + sdist from merge commit `44ece2f`), tag `v0.7.1`, GitHub release Latest; smoke check green.
+- **Open:** `0 outstanding` — follow-ups in BACKLOG G6–G10.
 - **Binding ruling:** §3 Release Actions and the KEEP GATE below carry the final ruling.
 - **On conflict:** the numbered body below wins for everything except `Status`/`Version`.
 
@@ -81,10 +81,10 @@ Prepared locally; the outward-facing rows are pending the user's go.
 
 | Action | Result |
 |---|---|
-| Version bump & tag | Bump done (0.7.0 to 0.7.1, `uv lock`). The earlier local tag on `e57ce6d` is to be dropped (`git tag -d v0.7.1`); `v0.7.1` goes on the merge commit of the repair PR, after the upload |
-| PR / merge | PR #3 merged as `1b62da0` next to PR #2; the combination crashed. Repair PR from `fix/coverage-current-names` pending review, QA and merge |
-| Deploy | Pending. Publish to PyPI, run by the maintainer (below) |
-| Post-release smoke check | Pending, after publish |
+| Version bump & tag | 0.7.1; annotated tag `v0.7.1` on merge commit `44ece2f`, pushed (the earlier local tag on `e57ce6d` was deleted, never pushed) |
+| PR / merge | PR #3 merged as `1b62da0` next to PR #2 (crashed); repair PR #4 merged as `44ece2f` |
+| Deploy | PyPI 0.7.1 uploaded by the maintainer from `44ece2f`: wheel 51996 B (sha256 f433bb02…), sdist 87604 B (031aec90…), equal to the local build. A first attempt was built on the wrong branch (failed checkout) and rejected by PyPI (password auth, 403) before anything was stored; `dist/` was deleted |
+| Post-release smoke check | Fresh Python 3.11 venv, `pip install aspark-graph==0.7.1` from PyPI: `build` on a current-name trail OK; MCP `serve` lists 9 tools; `gate_health` over MCP and CLI: `unverified_acs: []`, full coverage, no note (server started inside the repo, as confinement requires) |
 
 Pending commands, in order, each needing the go:
 1. `git push -u origin fix/coverage-current-names`, then `gh pr create --base main --head fix/coverage-current-names`, merge (merge commit); PR #3 (`feat/current-artifact-names`) is already merged
@@ -101,7 +101,7 @@ Pending commands, in order, each needing the go:
 ## 4. Learnings (Keep!)
 
 - **What went well:** scratch clones of Core and steamcore found what fixtures could not (escaped pipe B1, `⚠️ ... passed` read as pass); the trail under legacy names (R2) kept a byte-identical proof possible (against v0.7.0 for `e57ce6d`, against the previous main `ad83eae` after PR #2 added `coverage`); QA re-derived its evidence in round 2.
-- **What we'd do differently:** check `origin/main` for other merges before cutting the release commit (PR #2 landed in parallel and the combination crashed); read real files before writing the parser rule (B2 was known at plan time and still shipped as a limit); the NFR-1 benchmark fails under machine load, so run the slow suite on a quiet machine; `__version__` in `__init__.py` is stale (0.1.0) and pinned by a test.
+- **What we'd do differently:** chain the publish commands with `&&` and check `git rev-parse HEAD` first (a failed `git checkout` let the build run on the wrong branch); check `origin/main` for other merges before cutting the release commit (PR #2 landed in parallel and the combination crashed); read real files before writing the parser rule (B2 was known at plan time and still shipped as a limit); the NFR-1 benchmark fails under machine load, so run the slow suite on a quiet machine; `__version__` in `__init__.py` is stale (0.1.0) and pinned by a test.
 - **Patterns worth reusing:** (in CLAUDE.md now) old-names trail until the reader ships, wide real-data read before parser rules, marker-first result cells, version from package metadata not `__init__`.
 
 ---
@@ -110,7 +110,7 @@ Pending commands, in order, each needing the go:
 
 - [x] All pre-flight checks passed at release time — re-run on the repair commit `8b7a1b3` (§1, top block)
 - [x] Changelog written in user-facing language
-- [ ] Release actions executed and verified — prepared only; push, PR, publish, tag push and smoke check await the user's go
+- [x] Release actions executed and verified — PyPI, tag, GitHub release, smoke check (§3)
 - [x] Learnings recorded
 - [x] Line budget respected: Ist 101 / Soll ~100 (no HTML comments; blank lines counted)
-- [ ] Status set to `released` — stays `preparing` until the publish steps are done
+- [x] Status set to `released`
