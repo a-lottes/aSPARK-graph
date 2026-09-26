@@ -235,6 +235,63 @@ statt als strukturelle Vermutung zu melden. Fehlender Marker fällt auf die heut
 zurück. Gegenseite ist Item C3 im aSPARK-Repo — nicht ohne sie releasen.
 ```
 
+### G6 · `qa-multi-table` — alle Tabellen der QA-Verifikation lesen
+
+**Priorität: Nach v0.7.1. Aufgenommen am 2026-09-24 (Plan-Gate von `current-artifact-names`, Q1).**
+
+`_parse_qa` liest nur die **erste** Tabelle unter `## … Acceptance Criteria Verification`
+(`_first_table`). 4 von 13 `qa.md` in Core teilen die Sektion in `### US-n`-Teiltabellen
+(`graph-gates`, `lean-artifacts`, `project-kickoff`, `tracker-handoff`, 4–7 Tabellen je Bericht).
+Dort erscheint jedes AC nach der ersten Teiltabelle als `unverified` — kein Drift-Fehler, sondern
+stilles Unterzählen. steamcore (13×) und dieses Repo nutzen eine Tabelle und sind nicht betroffen.
+Offene Punkte für die Spec: fortlaufender `index` über Tabellen hinweg (QACheck-IDs), Byte-Identität
+für Ein-Tabellen-Berichte, Verhalten bei Teiltabellen mit abweichendem Kopf.
+
+```
+/spark qa-multi-table — _parse_qa liest jede Tabelle der Verifikations-Sektion statt nur der ersten,
+damit per-Story-Teiltabellen (### US-n) keine ACs als unverified verlieren. Ein-Tabellen-Berichte
+bauen byte-identisch wie bisher.
+```
+
+### G7 · `mcp-drift-result` — Template-Drift über MCP als strukturiertes Ergebnis
+
+**Priorität: Nach v0.7.1. Aufgenommen am 2026-09-25 (Review von `current-artifact-names`, F1 / Plan R4).**
+
+`server.build_graph` fängt nur `RepoRefused` (`server.py:25-28`). Eine fehlerhafte `qa.md`/`review.md`
+(bzw. Legacy-Name) wirft `TemplateDriftError` bis zum MCP-Client durch: der Agent sieht einen
+Tool-Fehler statt eines Dicts mit Datei und Grund. Vor v0.7.1 vorhanden; seit v0.7.1 häufiger
+erreichbar, weil QA- und Review-Dateien jedes aktuellen Projekts geparst werden. Die CLI meldet
+Drift laut (Exit ≠ 0) — das bleibt. Offene Punkte für die Spec: Form des Ergebnisses (z. B.
+`{"built": false, "reason": "template_drift", "file": …, "message": …}`), CLI≡MCP-Parität, keine
+teilweise gespeicherte `graph.json`.
+
+```
+/spark mcp-drift-result — MCP build_graph gibt TemplateDriftError als strukturiertes Ergebnis
+(Datei, Grund) zurück statt als Tool-Fehler; Drift bleibt laut, CLI unverändert.
+```
+
+### G8 · `qa-read-hardening` — Kleinbefunde aus dem QA von `current-artifact-names`
+
+**Priorität: Nach v0.7.1. Aufgenommen am 2026-09-25 (`/demo-day`, B3–B6 + Nachtrag zu B1).**
+
+- **B3:** Ein Verzeichnis namens `qa.md`/`review.md`/`release.md` (oder `*-report.md`) wirft einen
+  ungefangenen `IsADirectoryError` (CLI-Traceback, roher MCP-Fehler) statt einer Ein-Zeilen-Meldung.
+- **B4:** Zelle `✅ pass (was ❌ fail)` liest als `fail` (❌ gewinnt, konservativ, so in C13/README) —
+  Doku-Hinweis oder Regel für „was"-Klammern prüfen.
+- **B5:** Spec-Zeile `- [ ] AC-1.5 (Should, …): …` ohne Doppelpunkt direkt nach der ID erzeugt keinen AC-Knoten
+  (je 1 Zeile in Core und steamcore).
+- **B6:** Ein Symlink `qa.md` auf eine Datei außerhalb des Repos wird gelesen (wie 0.7.0 bei `qa-report.md`) —
+  an `security-posture` (Confinement) übergeben.
+- **F7 (Re-Review r2):** Die QA-Zellenlogik behandelt `\\|` (maskierter Backslash, dann Zellrand) als maskiertes
+  Pipe; GFM würde die Zelle trennen. 0 echte Fälle in diesem Repo, Core, steamcore.
+- **B1-Nachtrag:** v0.7.1 entmaskiert `\|` nur in der QA-Verifikationstabelle. Review-, Plan- und
+  Release-Tabellen splitten weiter an jedem `|`; prüfen, ob echte Zellen betroffen sind.
+
+```
+/spark qa-read-hardening — Verzeichnis-als-Artefakt sauber melden, AC-Zeilen ohne Doppelpunkt erkennen,
+Symlinks aus dem Repo heraus nicht folgen, `\|` in allen Artefakt-Tabellen.
+```
+
 ---
 
 ## 4. Bewusst nicht in diesem Backlog

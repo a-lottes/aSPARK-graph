@@ -35,6 +35,18 @@ SUPPORTED_TEMPLATE = "aspark/0.1.0"
 
 _SPARK_DIRNAME = ".spark"
 
+# Review, QA and release each exist under two names: the one aSPARK Core's
+# ceremonies write today, and the legacy one its templates (and older trails) use.
+# Resolved per artifact: the current name wins; a shadowed legacy file is
+# reported by the build, never merged (current-artifact-names US-4).
+_ARTIFACT_NAMES = (
+    ("review", "review.md", "review-report.md"),
+    ("qa", "qa.md", "qa-report.md"),
+    ("release", "release.md", "release-notes.md"),
+)
+# For build output: which current name shadows a given legacy name.
+CURRENT_NAME_FOR = {legacy: current for _, current, legacy in _ARTIFACT_NAMES}
+
 _STORY_RE = re.compile(r"^###\s+(US-\d+)\s*\(([^)]*)\)\s*:\s*(.+?)\s*$")
 _STORY_ANY_RE = re.compile(r"^###\s+US-", re.IGNORECASE)
 _AC_RE = re.compile(r"^\s*-\s*\[[ xX]?\]\s*(AC-\d+\.\d+)\s*:\s*(.+?)\s*$")
@@ -54,18 +66,35 @@ class TemplateDriftError(Exception):
 
 # --- public entry point ----------------------------------------------------
 
-def extract_features(repo_root: Path, graph: Graph) -> int:
-    """Parse every ``.spark/<feature>/`` trail into ``graph``. Returns node count."""
+def extract_features(repo_root: Path, graph: Graph, shadowed: list[str] | None = None) -> int:
+    """Parse every ``.spark/<feature>/`` trail into ``graph``. Returns node count.
+
+    If ``shadowed`` is given, every legacy artifact file ignored because its
+    current name exists is appended to it as ``.spark/<feature>/<name>``, in
+    feature order and then review, qa, release — never written to the graph."""
     spark = Path(repo_root) / _SPARK_DIRNAME
     if not spark.is_dir():
         return 0
     added = 0
     for feature_dir in sorted(p for p in spark.iterdir() if p.is_dir()):
-        added += _parse_feature(feature_dir, graph)
+        added += _parse_feature(feature_dir, graph, shadowed)
     return added
 
 
-def _parse_feature(feature_dir: Path, graph: Graph) -> int:
+def _resolve(feature_dir: Path, current: str, legacy: str, shadowed: list[str] | None) -> Path | None:
+    """The file to read for one artifact kind: the current name if it exists
+    (recording a legacy file it shadows), else the legacy name, else None.
+    Paths are only ever ``feature_dir / <literal from _ARTIFACT_NAMES>``."""
+    current_path = feature_dir / current
+    legacy_path = feature_dir / legacy
+    if current_path.exists():
+        if legacy_path.exists() and shadowed is not None:
+            shadowed.append(f"{_SPARK_DIRNAME}/{feature_dir.name}/{legacy}")
+        return current_path
+    return legacy_path if legacy_path.exists() else None
+
+
+def _parse_feature(feature_dir: Path, graph: Graph, shadowed: list[str] | None = None) -> int:
     feature = feature_dir.name
     fid = feature_id(feature)
     added = 0
@@ -75,9 +104,9 @@ def _parse_feature(feature_dir: Path, graph: Graph) -> int:
 
     spec = feature_dir / "spec.md"
     plan = feature_dir / "plan.md"
-    review = feature_dir / "review-report.md"
-    qa = feature_dir / "qa-report.md"
-    release = feature_dir / "release-notes.md"
+    review, qa, release = (
+        _resolve(feature_dir, current, legacy, shadowed) for _, current, legacy in _ARTIFACT_NAMES
+    )
 
     graph.add_node(fid, NodeType.FEATURE, name=feature)
     added += 1
@@ -88,13 +117,13 @@ def _parse_feature(feature_dir: Path, graph: Graph) -> int:
     if plan.exists():
         statuses["plan"] = _status(plan)
         added += _parse_plan(plan, feature, fid, graph)
-    if review.exists():
+    if review is not None:
         statuses["review"] = _status(review)
         added += _parse_review(review, feature, graph)
-    if qa.exists():
+    if qa is not None:
         statuses["qa"] = _status(qa)
         added += _parse_qa(qa, feature, graph)
-    if release.exists():
+    if release is not None:
         statuses["release"] = _status(release)
         version = _release_version(release)
 
@@ -246,18 +275,19 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    table = _first_table(section)
+    table = _first_table(section, unescape_pipes=True)
     if table is None:
         return 0
     header = {k.lower() for k in table["header"]}
-    if not any("ac" == h or h.startswith("ac") for h in header):
-        raise TemplateDriftError(str(path), f"QA table missing an 'AC' column (found {sorted(header)})")
+    id_col = _qa_id_column(table["header"])
+    if id_col is None:
+        raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
     if not any("result" in h for h in header):
         raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
 
     added = 0
     for index, row in enumerate(table["rows"]):
-        ac_cell = _col(row, "ac")
+        ac_cell = _col(row, id_col)
         m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
         if not m:
             continue
@@ -273,6 +303,21 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
             graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
         added += 1
     return added
+
+
+def _qa_id_column(header: list[str]) -> str | None:
+    """The QA table's id column, chosen by header in a fixed order: ``AC`` (legacy
+    template), ``Spec ID`` (Core's current template), then v0.7.0's looser
+    ``AC…`` prefix rule. ``Spec ID`` is checked before the prefix rule so a column
+    such as ``Actual`` can never capture the id. None means template drift."""
+    cells = [h.strip().lower() for h in header]
+    if "ac" in cells:
+        return "ac"
+    if "spec id" in cells:
+        return "spec id"
+    if any(h.startswith("ac") for h in cells):
+        return "ac"
+    return None
 
 
 # --- markdown helpers ------------------------------------------------------
@@ -308,14 +353,14 @@ def _section(lines: list[str], keyword: str) -> list[str] | None:
     return lines[start:end]
 
 
-def _first_table(block: list[str]) -> dict | None:
+def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
     """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}."""
     rows: list[list[str]] = []
     in_table = False
     for line in block:
         stripped = line.strip()
         if stripped.startswith("|") and stripped.endswith("|"):
-            rows.append(_split_row(stripped))
+            rows.append(_split_row(stripped, unescape_pipes))
             in_table = True
         elif in_table:
             break  # table ended
@@ -333,8 +378,14 @@ def _first_table(block: list[str]) -> dict | None:
     return {"header": header, "rows": data}
 
 
-def _split_row(line: str) -> list[str]:
-    return [c.strip() for c in line.strip().strip("|").split("|")]
+def _split_row(line: str, unescape_pipes: bool = False) -> list[str]:
+    if not unescape_pipes:
+        inner = line.strip().strip("|")
+        return [c.strip() for c in inner.split("|")]
+    # GFM: an escaped pipe belongs to its cell and is stored as a plain "|".
+    # An escaped pipe right before the closing one is cell content, not border.
+    inner = re.sub(r"(?<!\\)\|+$", "", line.strip().lstrip("|"))
+    return [c.replace("\\|", "|").strip() for c in re.split(r"(?<!\\)\|", inner)]
 
 
 def _col(row: dict, name: str) -> str:
@@ -358,10 +409,19 @@ def _moscow(value: str) -> str:
 
 
 def _normalise_result(cell: str) -> str:
-    low = (cell or "").lower()
-    if "✅" in cell or re.search(r"\bpass(ed|es|ing)?\b", low):
+    # An explicit marker is the verdict; the words after it only explain it
+    # ("⚠️ not capturable — never claimed as passed" is not a pass).
+    cell = cell or ""
+    if "❌" in cell:
+        return "fail"
+    if "⚠" in cell:
+        return "unknown"
+    if "✅" in cell:
         return "pass"
-    if "❌" in cell or re.search(r"\bfail(ed|s|ing|ure)?\b", low):
+    low = cell.lower()
+    if re.search(r"\bpass(ed|es|ing)?\b", low):
+        return "pass"
+    if re.search(r"\bfail(ed|s|ing|ure)?\b", low):
         return "fail"
     return "unknown"
 
