@@ -10,6 +10,7 @@ default repo="." regression.
 """
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -154,3 +155,45 @@ def test_ac_1_8_default_repo_accepted_from_a_real_checkout(monkeypatch):
     assert (checkout_root / ".git").exists()
     monkeypatch.chdir(checkout_root)
     assert confinement.ensure_repo(".") == checkout_root.resolve()
+
+
+# --- current-artifact-names T4 / AC-4.4, AC-4.5: ignored legacy files --------
+
+CURRENT_REPO = Path(__file__).parent / "fixtures" / "current_names_repo"
+
+
+def _mixed_copy(dest: Path) -> Path:
+    """The current-name fixture plus two legacy files its current names shadow."""
+    shutil.copytree(CURRENT_REPO, dest, ignore=shutil.ignore_patterns(".aspark-graph"))
+    feature = dest / ".spark" / "demo"
+    shutil.copy(feature / "qa.md", feature / "qa-report.md")
+    shutil.copy(feature / "release.md", feature / "release-notes.md")
+    return dest
+
+
+def test_ignored_legacy_files_same_on_cli_and_mcp(tmp_path, capsys):
+    a = _mixed_copy(tmp_path / "a")
+    b = _mixed_copy(tmp_path / "b")
+
+    rc = cli.main(["build", str(a)])
+    err = capsys.readouterr().err
+    result = _mcp_data("build_graph", {"path": str(b)})
+
+    assert rc == 0
+    assert "reason" not in result
+    cli_ignored = [line.split()[1] for line in err.splitlines() if line.startswith("Ignored ")]
+    assert cli_ignored == [".spark/demo/qa-report.md", ".spark/demo/release-notes.md"]
+    assert "Ignored .spark/demo/qa-report.md (qa.md takes precedence)" in err
+    assert result["ignored_legacy_files"] == cli_ignored
+    assert (a / ".aspark-graph" / "graph.json").read_bytes() == (b / ".aspark-graph" / "graph.json").read_bytes()
+
+
+def test_no_ignored_legacy_files_on_a_legacy_only_trail(tmp_path, capsys):
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    shutil.copytree(SAMPLE_REPO, a, ignore=shutil.ignore_patterns(".aspark-graph"))
+    shutil.copytree(SAMPLE_REPO, b, ignore=shutil.ignore_patterns(".aspark-graph"))
+
+    assert cli.main(["build", str(a)]) == 0
+    assert "Ignored " not in capsys.readouterr().err
+    assert _mcp_data("build_graph", {"path": str(b)})["ignored_legacy_files"] == []

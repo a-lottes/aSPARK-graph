@@ -32,6 +32,7 @@ def build_graph(path: str = ".") -> dict:
         "artifact_entities": report.artifact_entities,
         "inferred_edges": report.inferred_edges,
         "unparsed": report.unparsed,
+        "ignored_legacy_files": report.shadowed,
         "graph_path": str(out_path),
     }
 

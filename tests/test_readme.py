@@ -55,3 +55,28 @@ def test_ac_6_3_mcp_add_uses_working_entry_point():
     mcp_line = next(line for line in section.splitlines() if "claude mcp add" in line)
     assert "uvx" in mcp_line
     assert "uv run --directory" not in mcp_line
+
+
+# --- current-artifact-names (v0.7.1) T6: US-6 ---
+
+def _artifacts_section() -> str:
+    m = re.search(r"## Artifacts read\b(.*?)(?=\n## )", README, re.DOTALL)
+    assert m, "README has no Artifacts read section"
+    return m.group(1)
+
+
+def test_current_names_ac_6_1_no_six_language_count():
+    assert not re.search(r"\bsix\b", README, re.IGNORECASE)
+
+
+def test_current_names_ac_6_1_five_languages_stated():
+    normalized = " ".join(README.split())
+    assert "Python, TypeScript/JavaScript, Java, Go and Rust" in normalized
+
+
+def test_current_names_ac_6_3_artifact_names_listed():
+    section = _artifacts_section()
+    for name in ("spec.md", "plan.md", "review.md", "review-report.md",
+                 "qa.md", "qa-report.md", "release.md", "release-notes.md"):
+        assert f"`{name}`" in section, name
+    assert "current name wins" in " ".join(section.split())

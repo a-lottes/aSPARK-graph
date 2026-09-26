@@ -230,9 +230,25 @@ absence over a wrong cross-feature link.
 
 ## Supported languages
 
-Code extraction covers **TypeScript/JavaScript, Python and Java** (tree-sitter).
+Code extraction covers **Python, TypeScript/JavaScript, Java, Go and Rust** (tree-sitter).
 Files in other languages are recorded as unparsed `File` nodes — the build never
 fails on an unknown language.
+
+## Artifacts read
+
+Per feature folder in `.spark/`, the graph parses `spec.md` and `plan.md`, plus
+review, QA and release files under either name aSPARK has used:
+
+| Artifact | Current name | Legacy name |
+|---|---|---|
+| Review | `review.md` | `review-report.md` |
+| QA | `qa.md` | `qa-report.md` |
+| Release | `release.md` | `release-notes.md` |
+
+When both names exist in one folder, the current name wins. The build names the ignored
+file (`Ignored … (qa.md takes precedence)` on stderr, `ignored_legacy_files` over MCP), and
+the ignored file leaves no trace in the graph. A QA result cell is read by its marker
+first — `❌` fail, `⚠` unverified, `✅` pass — and by its words only when it has none.
 
 ## Design guarantees (why you can trust the output)
 
@@ -257,7 +273,7 @@ fails on an unknown language.
 
 ## Out of scope
 
-Languages beyond the six currently supported, an LLM/natural-language layer, precise
+Languages beyond the five currently supported, an LLM/natural-language layer, precise
 call-graph resolution, a visualization UI, exports (Neo4j/GraphML/Obsidian), HTTP/team
 mode, and authenticated or remote MCP transport are out of scope. The current language
 support is Python, TypeScript/JavaScript, Java, Go, and Rust.

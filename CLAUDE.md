@@ -5,7 +5,7 @@ Guidance for AI agents working in this repo. Part of the aSPARK product family.
 ## What this is
 
 A lean, local **code-and-artifact knowledge graph** served over MCP + a CLI. It
-links a repo's code (tree-sitter: TS/JS, Python, Java) with its `.spark/`
+links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust) with its `.spark/`
 delivery artifacts, so agents can ask `story_trace` ("which code implements this
 story, and did its ACs pass QA?") and `impact` ("what's the blast radius of
 changing these files?"). Deterministic and offline; the **persisted graph**
@@ -25,7 +25,7 @@ SDK), `gate-integration/` (v0.3.1 — portable aSPARK gate integration blocks,
 `CacheUnusable` fallback, NFR-1 benchmark),
 `robustness/` (v0.4.1 — `find_nodes("")` empty-query guard, MCP stdio transport smoke test),
 `go-rust-support/` (v0.5.0 — Go and Rust extractors: `File`/`Class`/`Function` nodes,
-best-effort in-repo `imports` resolution; six languages supported),
+best-effort in-repo `imports` resolution; five languages supported),
 `security-posture/` (v0.6.0 — repo-confinement rule enforced on all nine tools
 (`.git`/`.spark`/a prior `.aspark-graph/graph.json` marker), build bounds
 (entry-count bound + 5 MB per-file cap + symlink-cycle termination), `SECURITY.md`
@@ -34,8 +34,13 @@ documenting the trust boundary and six honest non-guarantees),
 / `uvx aspark-graph serve` replace install-from-source as the primary path;
 an explicit `[tool.hatch.build.targets.sdist]` allowlist in `pyproject.toml`
 keeps the published sdist to exactly `src/`, `tests/`, `README.md`, `LICENSE`,
-`pyproject.toml` — nothing untracked or locally git-ignored can reach it).
-**Current shipped version: 0.7.0.** Read the relevant trail before changing
+`pyproject.toml` — nothing untracked or locally git-ignored can reach it),
+`current-artifact-names/` (v0.7.1 — reads Core's current artifact names
+`review.md`/`qa.md`/`release.md` alongside the legacy `*-report.md`/`release-notes.md`;
+current name wins, the ignored legacy file is named on stderr / `ignored_legacy_files`;
+QA result cells read marker-first, an escaped `\|` keeps its columns; known limits:
+only the first QA verification table per `qa.md` is read (BACKLOG G6)).
+**Current shipped version: 0.7.1.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention
@@ -131,6 +136,24 @@ each adapter. Never compute an answer in an adapter.
   (`env | grep '^UV_PUBLISH' | cut -d= -f1`); check file *existence*, never
   contents (`test -f ~/.pypirc`); never ask the user to paste a token or a
   fragment of one into chat, even for debugging.
+- **A feature that changes which files the tool reads writes its own trail under
+  the OLD names until it ships** (v0.7.1). Otherwise the released tool reads what
+  its predecessor cannot, and the byte-identical-to-previous-release proof
+  (AC-5.1) is void. Every ceremony for such a feature uses `review-report.md`/
+  `qa-report.md`/`release-notes.md`; go-live globs for the current names first.
+- **Read a wide set of real files before writing a parser rule.** Scratch clones of
+  Core and steamcore during `/increment` and `/demo-day` found what synthetic
+  fixtures could not: an escaped pipe in a QA cell (B1, the only Major that
+  survived to QA), a `⚠️ ... passed` cell that the word matcher read as pass, and
+  4 of 13 Core `qa.md` files split into per-story tables (B2, G6). Record SHAs and
+  counts next to such evidence so it can be re-derived.
+- **Result cells are read marker-first (`❌` > `⚠` > `✅`), words second.** A marker
+  is the author's explicit verdict; a word can sit inside a caveat. Consequence:
+  `✅ pass (was ❌ fail)` reads fail (B4) — conservative, documented, not a bug.
+- **`aspark_graph.__version__` is stale (`0.1.0`) and pinned by `test_smoke.py`.**
+  Nothing user-visible reads it (no `--version`; MCP `serverInfo` reports the
+  `mcp` SDK's version, 1.19.0; the parse cache uses `importlib.metadata`). Read the version from
+  package metadata, never from `__init__`.
 - **Independent re-verification applies to "a fix was made and re-reviewed,"
   not only to "a session was interrupted."** Re-derive the evidence yourself
   (rebuild, re-read the raw output, re-run the suite) before resuming a
@@ -198,7 +221,7 @@ aspark-graph query gate_health aspark-graph
 ```bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 275 tests; keep green
+uv run pytest                # 319 tests; keep green
 uv run pytest -m slow        # 3 slow tests: NFR-1 bench, MCP transport smoke, sdist manifest
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .

@@ -49,6 +49,9 @@ class BuildReport:
     reparsed: int = 0             # files that went through the extractor
     cached: int = 0               # files reused from the parse cache
     fallback_reason: str | None = None  # set when incremental was attempted but fell back
+    # current-artifact-names US-4: legacy .spark/ files ignored because their current
+    # name exists (build output only, never graph content).
+    shadowed: list[str] = field(default_factory=list)
 
     def summary(self) -> str:
         line = f"{self.code_entities} code entities, {self.artifact_entities} artifact entities"
@@ -138,7 +141,7 @@ def build_graph(repo_root: str | Path, *, full: bool = False) -> tuple[Graph, Bu
     _resolve_imports(graph, extractions)
 
     report.code_entities = graph.counts()["code"]
-    report.artifact_entities = artifacts.extract_features(repo_root, graph)
+    report.artifact_entities = artifacts.extract_features(repo_root, graph, report.shadowed)
     # Best-effort inferred implements edges from git history. No-op if git
     # is unavailable (AC-1.6). Inference is out of scope for incremental
     # caching this cycle — it runs on every build (unchanged from prior versions).
