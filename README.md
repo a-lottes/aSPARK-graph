@@ -15,6 +15,11 @@ CLI **and** an MCP server. It is **deterministic** (tree-sitter + declared
 artifact links; **no LLM, no network**) and **disposable** (the graph is a
 rebuildable read model, never a source of truth).
 
+<a href="https://www.youtube.com/watch?v=60v74h-rFlA"><img alt="Watch the 60-second explainer: one file changed, which user stories did it touch?" src="https://raw.githubusercontent.com/a-lottes/aSPARK-graph/main/docs/graph-explainer-thumb.jpg" width="720"></a>
+
+▶ **[Watch the 60-second explainer](https://www.youtube.com/watch?v=60v74h-rFlA)** — real output
+only: the graph on screen is this repository's own graph at v0.7.1.
+
 ---
 
 ## The two questions it exists to answer
