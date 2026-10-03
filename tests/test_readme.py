@@ -80,3 +80,38 @@ def test_current_names_ac_6_3_artifact_names_listed():
                  "qa.md", "qa-report.md", "release.md", "release-notes.md"):
         assert f"`{name}`" in section, name
     assert "current name wins" in " ".join(section.split())
+
+
+def test_shallow_clone_warning_ac_3_1_readme_quotes_real_stderr(tmp_path, capsys, monkeypatch):
+    """AC-3.1: both notices, as the CLI really prints them, are quoted verbatim,
+    and the README names both MCP keys and the remedy."""
+    from aspark_graph import cli
+    from conftest import make_origin, make_trail, shallow_clone
+
+    clone = shallow_clone(make_origin(tmp_path / "origin"), tmp_path / "clone")
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    zipdir = tmp_path / "zip"
+    zipdir.mkdir()
+    make_trail(zipdir)
+
+    printed = []
+    for target in (clone, zipdir):
+        assert cli.main(["build", str(target)]) == 0
+        lines = capsys.readouterr().err.splitlines()
+        assert len(lines) == 1
+        printed.append(lines[0])
+
+    assert printed[0].startswith("Shallow git history")
+    assert printed[1].startswith("No git history")
+    for line in printed:
+        assert line in README
+    for term in ("shallow_history", "no_git_history", "git fetch --unshallow"):
+        assert term in README
+
+
+def test_shallow_clone_warning_t15_no_blanket_graph_json_claim():
+    """US-5 changes a shallow build's graph.json; the README must not say it
+    stays the same in general, and must say shallow builds only lose links."""
+    flat = " ".join(README.split())
+    assert "and `graph.json` stay the same" not in flat
+    assert "never extra ones" in flat

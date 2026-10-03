@@ -16,7 +16,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from . import artifacts, confinement, extractors, inference, parse_cache
+from . import artifacts, confinement, extractors, git, inference, parse_cache
 from .extractors.base import FileExtraction, language_for
 from .graph import Graph, default_graph_path
 from .model import (
@@ -33,6 +33,17 @@ _SKIP_DIRS = {
     ".pytest_cache", "dist", "build", ".mypy_cache", ".ruff_cache", ".idea",
     ".tox", "site-packages",
 }
+# shallow-clone-warning: the two user-approved notice texts (spec AC-1.1, AC-4.1).
+# A frozen contract (NFR-5) — a wording change is a spec change.
+SHALLOW_HISTORY_NOTICE = (
+    "Shallow git history: inferred links may be missing "
+    "(run 'git fetch --unshallow', then rebuild)."
+)
+NO_GIT_HISTORY_NOTICE = (
+    "No git history: inferred links are missing "
+    "(build from a full git clone to get them)."
+)
+
 # Common source roots stripped when computing a Python module's dotted name.
 _PY_SOURCE_ROOTS = ("src/", "lib/")
 
@@ -52,6 +63,27 @@ class BuildReport:
     # current-artifact-names US-4: legacy .spark/ files ignored because their current
     # name exists (build output only, never graph content).
     shadowed: list[str] = field(default_factory=list)
+    # shallow-clone-warning: git.read_history().state of the build root, checked only
+    # when the graph has >=1 plan Task (C5); None means "not checked". Build
+    # output only, never graph content (C4).
+    git_history: str | None = None
+
+    @property
+    def shallow_history(self) -> bool:
+        return self.git_history == "shallow"
+
+    @property
+    def no_git_history(self) -> bool:
+        return self.git_history == "none"
+
+    def history_notice(self) -> str | None:
+        """The one notice line for this build, or None. Both flags derive from
+        the single ``git_history`` field, so at most one notice can apply."""
+        if self.shallow_history:
+            return SHALLOW_HISTORY_NOTICE
+        if self.no_git_history:
+            return NO_GIT_HISTORY_NOTICE
+        return None
 
     def summary(self) -> str:
         line = f"{self.code_entities} code entities, {self.artifact_entities} artifact entities"
@@ -145,7 +177,14 @@ def build_graph(repo_root: str | Path, *, full: bool = False) -> tuple[Graph, Bu
     # Best-effort inferred implements edges from git history. No-op if git
     # is unavailable (AC-1.6). Inference is out of scope for incremental
     # caching this cycle — it runs on every build (unchanged from prior versions).
-    report.inferred_edges = inference.infer_implements(graph, repo_root)
+    # shallow-clone-warning: one git call reads how much history there is, but
+    # only where inference has something to link (>=1 plan Task, C5). The same
+    # result names it in the build output and keeps a shallow clone's boundary
+    # commits out of inference (US-5).
+    history = git.read_history(repo_root) if graph.nodes(NodeType.TASK) else None
+    if history is not None:
+        report.git_history = history.state
+    report.inferred_edges = inference.infer_implements(graph, repo_root, history)
 
     # Always rewrite the cache after a successful build (full or incremental).
     # This means --full replaces the cache with fresh state (AC-4.2) and first

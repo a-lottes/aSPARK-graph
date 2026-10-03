@@ -248,6 +248,25 @@ numbering, a commit is resolved to a **single** feature before linking (by the
 message); a genuinely ambiguous commit contributes **no** edge — an honest
 absence over a wrong cross-feature link.
 
+### Shallow clones and ZIP downloads
+
+`inferred` links need commit history. A shallow clone (`git clone --depth 1`, the
+default in many CI setups) has only part of it, and a ZIP download has none. When
+the graph has at least one plan task, `build` says so on stderr:
+
+```
+Shallow git history: inferred links may be missing (run 'git fetch --unshallow', then rebuild).
+No git history: inferred links are missing (build from a full git clone to get them).
+```
+
+At most one of the two lines appears. MCP `build_graph` reports the same as two
+booleans, `shallow_history` and `no_git_history`. In a shallow clone, git shows
+the oldest kept (boundary) commits as adding every file, so the build skips their
+`inferred` links: `impact` can show fewer links than on a full clone, never extra
+ones. The exit code and the stdout format are unchanged, and on a full clone
+`graph.json` is byte-identical to earlier versions. To get the missing links, run
+`git fetch --unshallow` (or build from a full clone) and rebuild.
+
 ## Supported languages
 
 Code extraction covers **Python, TypeScript/JavaScript, Java, Go and Rust** (tree-sitter).

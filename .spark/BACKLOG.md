@@ -329,6 +329,26 @@ betriebssystemunabhängig, alte Graphen ohne coverage als „unbekannt" melden, 
 
 ---
 
+### G11 · `history-edge-cases` — Restbefunde aus `shallow-clone-warning`
+
+**Priorität: Nach v0.7.2. Aufgenommen am 2026-10-03 (QA von `shallow-clone-warning`, B1/B2, User-Entscheidung; A6 aus der Spec).**
+
+- **B2 (Minor, schon in v0.7.1):** Ein Projekt im Unterordner eines Monorepos (`build proj`) bekommt keine
+  `inferred`-Links: git meldet Pfade relativ zur Repo-Wurzel (`proj/src/p.py`), die Graph-Knoten sind relativ zum
+  Build-Pfad (`file:src/p.py`). Kein Hinweis erklärt das. Lösung: Pfade über `git rev-parse --show-prefix` umrechnen.
+- **B1 (Minor, schon in v0.7.1):** `test_nfr1_incremental_at_least_50_percent_faster` (`-m slow`) scheitert unter
+  Last (37–40 % statt 50 % bei Load ~5, auch auf v0.7.1-Code). Benchmark robuster machen (Wiederholungen, Median,
+  oder relative Schwelle) statt die NFR aufzuweichen.
+- **A6:** Ein `--filter=tree:0`-Klon kann während der Inferenz Bäume nachladen (Netzwerk). Prüfen und, falls ja,
+  wie Shallow behandeln oder benennen.
+
+```
+/spark history-edge-cases — Monorepo-Unterprojekte bekommen inferred-Links (Pfad-Präfix), Inkremental-Benchmark
+lastfest, tree:0-Klone offline halten oder benennen.
+```
+
+---
+
 ## 4. Bewusst nicht in diesem Backlog
 
 | Review-Empfehlung | Warum nicht |

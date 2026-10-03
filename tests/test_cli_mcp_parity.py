@@ -197,3 +197,102 @@ def test_no_ignored_legacy_files_on_a_legacy_only_trail(tmp_path, capsys):
     assert cli.main(["build", str(a)]) == 0
     assert "Ignored " not in capsys.readouterr().err
     assert _mcp_data("build_graph", {"path": str(b)})["ignored_legacy_files"] == []
+
+
+# --- shallow-clone-warning T7: notice ⇔ MCP key, on every US-1/US-4 fixture ---
+
+import subprocess  # noqa: E402
+
+from aspark_graph.build import NO_GIT_HISTORY_NOTICE, SHALLOW_HISTORY_NOTICE  # noqa: E402
+
+from conftest import (  # noqa: E402
+    full_clone, git_commit, init_git_repo, make_boundary_origin, make_origin, make_trail,
+    shallow_clone,
+)
+
+_V071_BUILD_KEYS = {
+    "code_entities", "artifact_entities", "inferred_edges", "unparsed",
+    "ignored_legacy_files", "graph_path",
+}
+
+
+def _monorepo_origin(root):
+    """A full repo whose .spark/ project sits in proj/ (the A7 subdirectory build)."""
+    root.mkdir(parents=True)
+    init_git_repo(root)
+    make_trail(root / "proj")
+    git_commit(root, "docs: add spark trail")
+    (root / "proj" / "src").mkdir()
+    (root / "proj" / "src" / "app.py").write_text("def run():\n    return 1\n")
+    git_commit(root, "T1: implement app (US-1)")
+    return root
+
+
+def _history_fixture(shape, base, monkeypatch):
+    """Build one of the nine AC-2.4 fixtures under ``base``; return the build path."""
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(base))
+    if shape == "no-git" or shape == "no-git-no-task":
+        path = base / "zip"
+        path.mkdir(parents=True)
+        make_trail(path, with_task=shape == "no-git")
+        (path / "app.py").write_text("def run():\n    return 1\n")
+        return path
+    if shape.startswith("boundary"):
+        origin = make_boundary_origin(base / "origin")
+        if shape == "boundary-full":
+            return full_clone(origin, base / "clone")
+        depth = "1" if shape == "boundary-depth1" else "3"
+        clone = shallow_clone(origin, base / "clone", "--depth", depth)
+        if shape == "boundary-corrupt-marker":
+            (clone / ".git" / "shallow").write_text("this is not a sha\n")
+        return clone
+    if shape.startswith("subdir"):
+        origin = _monorepo_origin(base / "origin")
+        clone = (shallow_clone if shape == "subdir-of-shallow" else full_clone)(origin, base / "clone")
+        return clone / "proj"
+    origin = make_origin(base / "origin", with_task=shape != "shallow-no-task")
+    if shape in ("shallow", "shallow-no-task"):
+        return shallow_clone(origin, base / "clone")
+    if shape == "single-branch":
+        return full_clone(origin, base / "clone", "--single-branch")
+    clone = full_clone(origin, base / "clone")
+    if shape == "detached":
+        subprocess.run(["git", "-C", str(clone), "checkout", "-q", "--detach", "HEAD~1"],
+                       check=True, capture_output=True, text=True)
+    return clone
+
+
+_SHAPES = {  # shape -> (shallow_history, no_git_history)
+    "shallow": (True, False),
+    "full": (False, False),
+    "shallow-no-task": (False, False),
+    "no-git": (False, True),
+    "no-git-no-task": (False, False),
+    "subdir-of-full": (False, False),
+    "subdir-of-shallow": (True, False),
+    "detached": (False, False),
+    "single-branch": (False, False),
+    "boundary-depth1": (True, False),
+    "boundary-depth3": (True, False),
+    "boundary-full": (False, False),
+    "boundary-corrupt-marker": None,  # whatever git reports; only ⇔ and never-both are asserted
+}
+
+
+@pytest.mark.parametrize("shape", sorted(_SHAPES))
+def test_history_notice_iff_mcp_key_on_every_fixture(tmp_path, capsys, monkeypatch, shape):
+    a = _history_fixture(shape, tmp_path / "a", monkeypatch)
+    b = _history_fixture(shape, tmp_path / "b", monkeypatch)
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+
+    assert cli.main(["build", str(a)]) == 0
+    err = capsys.readouterr().err.splitlines()
+    result = _mcp_data("build_graph", {"path": str(b)})
+
+    if _SHAPES[shape] is not None:
+        assert (result["shallow_history"], result["no_git_history"]) == _SHAPES[shape]
+    assert (SHALLOW_HISTORY_NOTICE in err) == result["shallow_history"]
+    assert (NO_GIT_HISTORY_NOTICE in err) == result["no_git_history"]
+    assert not (result["shallow_history"] and result["no_git_history"])
+    assert set(result) == _V071_BUILD_KEYS | {"shallow_history", "no_git_history"}
+    assert (a / ".aspark-graph" / "graph.json").read_bytes() == (b / ".aspark-graph" / "graph.json").read_bytes()

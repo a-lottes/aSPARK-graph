@@ -26,7 +26,7 @@ from .model import Confidence, EdgeType, NodeType, file_id
 _SPARK_FEATURE_RE = re.compile(r"(?:^|/)\.spark/([^/]+)/")
 
 
-def infer_implements(graph: Graph, repo_root: str | Path) -> int:
+def infer_implements(graph: Graph, repo_root: str | Path, history: git.GitHistory | None = None) -> int:
     """Add inferred ``implements`` edges from git history. Returns edges added.
 
     A file is linked to a task when a commit whose message references the task's
@@ -44,8 +44,18 @@ def infer_implements(graph: Graph, repo_root: str | Path) -> int:
       no ``.spark/`` tree while two features both map a task to ``US-1`` — the
       commit is genuinely ambiguous and contributes **no** edges. An honest
       absence beats an obviously-wrong cross-feature link (AC-1.4).
+
+    Truncated history only ever loses links (shallow-clone-warning US-5): a
+    shallow clone's grafted boundary commits are skipped, because git lists
+    every file as added by them. If that set cannot be read, no edge is added
+    (C12). ``history`` is the build's one :func:`git.read_history` result; a
+    caller that omits it gets the same check here, so no path invents links.
     """
-    if not git.is_git_repo(repo_root):
+    if not graph.nodes(NodeType.TASK):
+        return 0
+    if history is None:
+        history = git.read_history(repo_root)
+    if history.state == "none" or history.boundary is None:
         return 0
 
     # task node -> (feature, task_id, story_id); collect the ids to match.
@@ -63,7 +73,7 @@ def infer_implements(graph: Graph, repo_root: str | Path) -> int:
         if story_ref:
             all_ids.add(story_ref)
 
-    records = git.log_records(repo_root)
+    records = git.log_records(repo_root, skip=history.boundary)
     if not all_ids or not records:
         return 0
     id_pattern = re.compile(r"\b(" + "|".join(re.escape(i) for i in sorted(all_ids)) + r")\b")

@@ -39,8 +39,13 @@ keeps the published sdist to exactly `src/`, `tests/`, `README.md`, `LICENSE`,
 `review.md`/`qa.md`/`release.md` alongside the legacy `*-report.md`/`release-notes.md`;
 current name wins, the ignored legacy file is named on stderr / `ignored_legacy_files`;
 QA result cells read marker-first, an escaped `\|` keeps its columns; known limits:
-only the first QA verification table per `qa.md` is read (BACKLOG G6)).
-**Current shipped version: 0.7.1.** Read the relevant trail before changing
+only the first QA verification table per `qa.md` is read (BACKLOG G6)),
+`shallow-clone-warning/` (v0.7.2 — a shallow or git-less build names the condition
+on stderr and in the MCP `build_graph` booleans `shallow_history`/`no_git_history`;
+grafted boundary commits contribute no inferred links, so truncated history only
+loses links; non-shallow graph.json byte-identical to v0.7.1; known limits: git
+< 2.15, monorepo subprojects, `--filter=tree:0` (BACKLOG G11)).
+**Current shipped version: 0.7.2.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention

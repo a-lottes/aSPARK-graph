@@ -175,6 +175,9 @@ def _cmd_build(args) -> int:
     for path in report.shadowed:
         current = artifacts.CURRENT_NAME_FOR[path.rsplit("/", 1)[-1]]
         print(f"Ignored {path} ({current} takes precedence)", file=sys.stderr)
+    notice = report.history_notice()
+    if notice:
+        print(notice, file=sys.stderr)
     out_path = default_graph_path(args.path)
     graph.save(out_path)
     print(f"Built graph: {report.summary()}")

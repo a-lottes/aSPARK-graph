@@ -34,6 +34,8 @@ def build_graph(path: str = ".") -> dict:
         "unparsed": report.unparsed,
         "ignored_legacy_files": report.shadowed,
         "graph_path": str(out_path),
+        "shallow_history": report.shallow_history,
+        "no_git_history": report.no_git_history,
     }
 
 
