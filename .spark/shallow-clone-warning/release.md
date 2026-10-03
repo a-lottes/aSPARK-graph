@@ -9,13 +9,13 @@
 | **Version** | v0.7.2 (patch, spec C6: one new stderr notice, two new always-present MCP keys, no breaking change) |
 | **Date** | 2026-10-03 |
 | **Commit** | pending: the tag goes on the PR's merge commit after merge; release commit on the branch `699b02e70df9b3c093eaa7e8dadda1fe5af79a7b` |
-| **PR** | pending the user's go (branch `feat/shallow-clone-warning` → `main`) |
+| **PR** | https://github.com/a-lottes/aSPARK-graph/pull/8 (open, `feat/shallow-clone-warning` → `main`; not merged) |
 | **Ticket** | none |
 
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status` and `Version`).
-- **Summary:** v0.7.2 prepared locally on `feat/shallow-clone-warning` (release commit `699b02e`); pre-flight green; nothing pushed, tagged or uploaded.
-- **Open:** `1 outstanding`: the user's go for push, PR, merge, PyPI upload (the user), tag and GitHub release (§3).
+- **Summary:** v0.7.2 release commit `699b02e` pushed on `feat/shallow-clone-warning`, PR #8 open to `main`; pre-flight green; not merged, tagged or uploaded.
+- **Open:** `1 outstanding`: merge of PR #8 and the PyPI upload (the user), then tag and GitHub release (§3, steps 3–7).
 - **Binding ruling:** §3 Release Actions and the KEEP GATE below carry the final ruling.
 - **On conflict:** the numbered body below wins for everything except `Status`/`Version`.
 
@@ -58,18 +58,18 @@ Run 2026-10-03 on `699b02e` (code identical to the gated `c144cb0` plus the vers
 
 ## 3. Release Actions
 
-Prepared locally; every outward-facing step waits for the user's go. No local tag: the established flow (v0.7.1) tags the merge commit after the PR merges.
+Steps 1–2 done with the user's go (2026-10-03); steps 3–7 are still pending. No local tag: the established flow (v0.7.1) tags the merge commit after the PR merges.
 
 | Action | Result |
 |---|---|
 | Version bump & tag | 0.7.2 committed as `699b02e` (pyproject.toml, uv.lock, CLAUDE.md trail entry); tag `v0.7.2` pending, goes on the merge commit |
-| PR / merge | pending: push and `gh pr create` need the go; merge with a merge commit |
+| PR / merge | branch pushed to `origin/feat/shallow-clone-warning`; PR #8 opened: https://github.com/a-lottes/aSPARK-graph/pull/8; merge (merge commit) is the user's |
 | Deploy | pending: PyPI upload of 0.7.2 by the user (twine, their token), built from the merge commit |
 | Post-release smoke check | pending: after the upload |
 
 Pending commands, in order:
-1. `git push -u origin feat/shallow-clone-warning`
-2. `gh pr create --repo a-lottes/aSPARK-graph --base main --head feat/shallow-clone-warning --title "feat(shallow-clone-warning): name shallow or missing git history (v0.7.2)" --body-file <PR body>`; then merge with a merge commit. If PR #7 merges first, run the suite on the merge again.
+1. Done: `git push -u origin feat/shallow-clone-warning`
+2. Done (PR #8): `gh pr create --repo a-lottes/aSPARK-graph --base main --head feat/shallow-clone-warning --title "feat(shallow-clone-warning): name shallow or missing git history (v0.7.2)" --body-file <PR body>`; then merge with a merge commit. If PR #7 merges first, run the suite on the merge again.
 3. User, own shell: `git checkout main && git pull && git rev-parse HEAD` (must be the merge commit) `&& rm -rf dist && uv build && twine upload dist/*` (`rm -rf dist` because `dist/` holds the 0.7.1 files)
 4. Verify: `curl -s https://pypi.org/pypi/aspark-graph/json` shows 0.7.2 with wheel and sdist
 5. `git tag -a v0.7.2 <merge-sha> -m "aspark-graph v0.7.2 — name shallow or missing git history" && git push origin v0.7.2`
@@ -77,8 +77,7 @@ Pending commands, in order:
 7. Smoke: fresh venv, `pip install aspark-graph==0.7.2`; `build` on a `--depth 1` clone shows the shallow notice; `serve` lists 9 tools
 
 **Rollback path.**
-- Now (nothing published): `git reset --hard c144cb0` on the branch, or just don't push.
-- After push or PR, before merge: close the PR and delete the remote branch.
+- Now (pushed, PR open, not merged): `gh pr close 8 --delete-branch`; nothing is on main or PyPI.
 - After merge: `git revert -m 1 <merge-sha>` on main through a PR; no history rewrite.
 - After upload: 0.7.2 is burned on PyPI. The user yanks it in the PyPI web UI, and a fix ships as 0.7.3; `pip install aspark-graph==0.7.1` is the known-good version. Wrong tag or release: `gh release delete v0.7.2 --cleanup-tag`.
 
@@ -96,5 +95,5 @@ Pending commands, in order:
 - [x] Changelog written in user-facing language
 - [ ] Release actions executed and verified: prepared, awaiting the user's go (§3)
 - [x] Learnings recorded
-- [x] Line budget respected: Ist 100 / Soll ~100 (no HTML comments)
+- [x] Line budget respected: Ist 99 / Soll ~100 (no HTML comments)
 - [ ] Status set to `released`: currently `preparing`
