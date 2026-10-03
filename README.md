@@ -20,6 +20,21 @@ rebuildable read model, never a source of truth).
 ▶ **[Watch the 60-second explainer](https://www.youtube.com/watch?v=60v74h-rFlA)** — real output
 only: the graph on screen is this repository's own graph at v0.7.1.
 
+## Try it in 30 seconds
+
+No aSPARK project of your own? This repository has a real delivery trail, so it works as
+the demo. You need [uv](https://docs.astral.sh/uv/) and a **full** clone:
+
+```bash
+git clone https://github.com/a-lottes/aSPARK-graph && cd aSPARK-graph
+uvx aspark-graph build .
+uvx aspark-graph query impact src/aspark_graph/queries.py
+```
+
+That prints the user stories and acceptance criteria a change to `queries.py` touches, each
+tagged `declared`, `extracted` or `inferred`. Use a full clone: `inferred` links come from
+the git history, and a shallow clone (`--depth 1`) builds without them.
+
 ---
 
 ## The two questions it exists to answer
@@ -54,7 +69,7 @@ and orphan detection possible at all.
   isn't viable, when you need a fast, reproducible answer *before* opening files.
 - ❌ **Skip it** on a repo small enough to hold in your head (just read the
   files), or a repo with no `.spark/` artifacts (the artifact layer is the whole
-  point).
+  point; to see what it does, run the demo above on this repository).
 - 🤝 **Want a broad semantic code graph too?** Run
   [Graphify](https://github.com/safishamsi/graphify) alongside it — different
   scope, no conflict. aspark-graph is an accelerant for aSPARK, not a replacement
