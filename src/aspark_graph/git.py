@@ -2,7 +2,7 @@
 
 Every helper reads only the local object store and **never raises** to its
 caller: a missing ``git`` binary, a non-repo directory, a shallow/empty clone,
-or a bad range all yield an empty/typed result. This keeps inference a pure
+or a bad range all yield an empty/typed result (``history_state`` included). This keeps inference a pure
 enhancement — its absence degrades the build to v0.1.0 behaviour (AC-1.6),
 never a crash.
 
@@ -37,6 +37,26 @@ def _run(root: str | Path, args: list[str]) -> tuple[int, str]:
 def is_git_repo(root: str | Path) -> bool:
     code, out = _run(root, ["rev-parse", "--is-inside-work-tree"])
     return code == 0 and out.strip() == "true"
+
+
+def history_state(root: str | Path) -> str:
+    """How much commit history inference can read: ``"full"``, ``"shallow"`` or
+    ``"none"``. One local ``git rev-parse`` call, no network. Never raises.
+
+    ``"none"`` uses the same test as :func:`is_git_repo` (not a work tree, no git
+    binary, corrupt ``.git``), so it holds exactly when inference was skipped. A
+    subdirectory of a clone, a detached ``HEAD``, a ``--single-branch`` clone and
+    a repo with no commits all read ``"full"``. git < 2.15 echoes the
+    ``--is-shallow-repository`` flag back instead of answering; the strict
+    ``== "true"`` comparison then reads ``"full"`` — the v0.7.1 behaviour.
+    """
+    code, out = _run(root, ["rev-parse", "--is-inside-work-tree", "--is-shallow-repository"])
+    lines = out.splitlines()
+    if code != 0 or not lines or lines[0].strip() != "true":
+        return "none"
+    if len(lines) > 1 and lines[1].strip() == "true":
+        return "shallow"
+    return "full"
 
 
 def log_records(root: str | Path) -> list[dict]:

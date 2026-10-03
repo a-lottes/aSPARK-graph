@@ -98,3 +98,58 @@ def git_backed_repo(tmp_path):
     git_commit(root, "T1: implement app (US-1)")
 
     return root
+
+
+# --- shallow-clone-warning fixtures ---------------------------------------
+
+def make_trail(root, *, with_task=True):
+    """A minimal .spark/ trail: an approved spec with one AC and, unless
+    ``with_task`` is False, a plan with one task T1 (the C5 gate needs >=1
+    plan Task node)."""
+    spark = Path(root) / ".spark" / "demo"
+    spark.mkdir(parents=True, exist_ok=True)
+    (spark / "spec.md").write_text(
+        "# Spec: demo\n\n| **Status** | `approved` |\n\n## 4. User Stories\n\n"
+        "### US-1 (Must): Run the app\n\n"
+        "**Acceptance criteria:**\n\n"
+        "- [ ] AC-1.1: Given the app, when I run it, then it returns a value.\n"
+    )
+    if with_task:
+        (spark / "plan.md").write_text(
+            "# Plan: demo\n\n| **Status** | `approved` |\n\n## 3. Task Breakdown\n\n"
+            "| # | Task | Story | Depends on | Status | Definition of Done |\n"
+            "|---|---|---|---|---|---|\n"
+            "| T1 | Implement app | US-1 | – | `done` | app returns a value |\n"
+        )
+
+
+def make_origin(root, *, with_task=True):
+    """A >=2-commit repo whose second commit message names T1, so inference
+    has history to read (the spec's US-1 fixture source)."""
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    init_git_repo(root)
+    make_trail(root, with_task=with_task)
+    git_commit(root, "docs: add spark trail")
+    (root / "src").mkdir()
+    (root / "src" / "app.py").write_text("def run():\n    return 1\n")
+    git_commit(root, "T1: implement app (US-1)")
+    return root
+
+
+def shallow_clone(src, dst, *extra):
+    """``git clone --depth 1`` via a file:// URI: with a plain path git ignores
+    ``--depth`` and silently makes a full clone (plan R4)."""
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1", *extra, Path(src).as_uri(), str(dst)],
+        check=True, capture_output=True, text=True,
+    )
+    return Path(dst)
+
+
+def full_clone(src, dst, *extra):
+    subprocess.run(
+        ["git", "clone", "-q", *extra, Path(src).as_uri(), str(dst)],
+        check=True, capture_output=True, text=True,
+    )
+    return Path(dst)
