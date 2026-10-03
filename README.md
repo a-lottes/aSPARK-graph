@@ -245,10 +245,12 @@ No git history: inferred links are missing (build from a full git clone to get t
 ```
 
 At most one of the two lines appears. MCP `build_graph` reports the same as two
-booleans, `shallow_history` and `no_git_history`. The exit code, stdout and
-`graph.json` stay the same, so the notice is informational: run
-`git fetch --unshallow` (or build from a full clone) and rebuild to get the
-missing links.
+booleans, `shallow_history` and `no_git_history`. In a shallow clone, git shows
+the oldest kept (boundary) commits as adding every file, so the build skips their
+`inferred` links: `impact` can show fewer links than on a full clone, never extra
+ones. The exit code and the stdout format are unchanged, and on a full clone
+`graph.json` is byte-identical to earlier versions. To get the missing links, run
+`git fetch --unshallow` (or build from a full clone) and rebuild.
 
 ## Supported languages
 

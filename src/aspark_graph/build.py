@@ -177,11 +177,14 @@ def build_graph(repo_root: str | Path, *, full: bool = False) -> tuple[Graph, Bu
     # Best-effort inferred implements edges from git history. No-op if git
     # is unavailable (AC-1.6). Inference is out of scope for incremental
     # caching this cycle — it runs on every build (unchanged from prior versions).
-    report.inferred_edges = inference.infer_implements(graph, repo_root)
-    # shallow-clone-warning: name truncated/absent history, but only where
-    # inference had something to link (>=1 plan Task, C5). One git call.
-    if graph.nodes(NodeType.TASK):
-        report.git_history = git.history_state(repo_root)
+    # shallow-clone-warning: one git call reads how much history there is, but
+    # only where inference has something to link (>=1 plan Task, C5). The same
+    # result names it in the build output and keeps a shallow clone's boundary
+    # commits out of inference (US-5).
+    history = git.read_history(repo_root) if graph.nodes(NodeType.TASK) else None
+    if history is not None:
+        report.git_history = history.state
+    report.inferred_edges = inference.infer_implements(graph, repo_root, history)
 
     # Always rewrite the cache after a successful build (full or incremental).
     # This means --full replaces the cache with fresh state (AC-4.2) and first

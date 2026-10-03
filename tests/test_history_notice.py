@@ -60,13 +60,26 @@ def _no_git_dir(path, monkeypatch, ceiling, *, with_task=True):
 @pytest.fixture
 def history_spy(monkeypatch):
     calls = []
-    real = git.history_state
+    real = git.read_history
 
     def spy(root):
         calls.append(root)
         return real(root)
 
-    monkeypatch.setattr(git, "history_state", spy)
+    monkeypatch.setattr(git, "read_history", spy)
+    return calls
+
+
+@pytest.fixture
+def run_spy(monkeypatch):
+    calls = []
+    real = git._run
+
+    def spy(root, args):
+        calls.append(args)
+        return real(root, args)
+
+    monkeypatch.setattr(git, "_run", spy)
     return calls
 
 
@@ -96,6 +109,18 @@ def test_t3_with_a_plan_task_exactly_one_check_per_build(tmp_path, history_spy):
     history_spy.clear()
     build_graph(clone)
     assert len(history_spy) == 1
+
+
+def test_t3_git_call_budget_matches_v071(tmp_path, monkeypatch, run_spy):
+    """NFR-1/C12: a Task build makes at most v0.7.1's 3 git calls; no Task, none."""
+    clone = shallow_clone(make_origin(tmp_path / "origin"), tmp_path / "clone")
+    no_task = shallow_clone(make_origin(tmp_path / "origin2", with_task=False), tmp_path / "clone2")
+    run_spy.clear()
+    build_graph(clone)
+    assert len(run_spy) <= 3
+    run_spy.clear()
+    build_graph(no_task)
+    assert run_spy == []
 
 
 # --- T4: no git history end to end (US-4) -----------------------------------

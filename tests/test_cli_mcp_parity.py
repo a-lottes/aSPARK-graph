@@ -206,7 +206,8 @@ import subprocess  # noqa: E402
 from aspark_graph.build import NO_GIT_HISTORY_NOTICE, SHALLOW_HISTORY_NOTICE  # noqa: E402
 
 from conftest import (  # noqa: E402
-    full_clone, git_commit, init_git_repo, make_origin, make_trail, shallow_clone,
+    full_clone, git_commit, init_git_repo, make_boundary_origin, make_origin, make_trail,
+    shallow_clone,
 )
 
 _V071_BUILD_KEYS = {
@@ -236,6 +237,15 @@ def _history_fixture(shape, base, monkeypatch):
         make_trail(path, with_task=shape == "no-git")
         (path / "app.py").write_text("def run():\n    return 1\n")
         return path
+    if shape.startswith("boundary"):
+        origin = make_boundary_origin(base / "origin")
+        if shape == "boundary-full":
+            return full_clone(origin, base / "clone")
+        depth = "1" if shape == "boundary-depth1" else "3"
+        clone = shallow_clone(origin, base / "clone", "--depth", depth)
+        if shape == "boundary-corrupt-marker":
+            (clone / ".git" / "shallow").write_text("this is not a sha\n")
+        return clone
     if shape.startswith("subdir"):
         origin = _monorepo_origin(base / "origin")
         clone = (shallow_clone if shape == "subdir-of-shallow" else full_clone)(origin, base / "clone")
@@ -262,6 +272,10 @@ _SHAPES = {  # shape -> (shallow_history, no_git_history)
     "subdir-of-shallow": (True, False),
     "detached": (False, False),
     "single-branch": (False, False),
+    "boundary-depth1": (True, False),
+    "boundary-depth3": (True, False),
+    "boundary-full": (False, False),
+    "boundary-corrupt-marker": None,  # whatever git reports; only ⇔ and never-both are asserted
 }
 
 
@@ -275,7 +289,8 @@ def test_history_notice_iff_mcp_key_on_every_fixture(tmp_path, capsys, monkeypat
     err = capsys.readouterr().err.splitlines()
     result = _mcp_data("build_graph", {"path": str(b)})
 
-    assert (result["shallow_history"], result["no_git_history"]) == _SHAPES[shape]
+    if _SHAPES[shape] is not None:
+        assert (result["shallow_history"], result["no_git_history"]) == _SHAPES[shape]
     assert (SHALLOW_HISTORY_NOTICE in err) == result["shallow_history"]
     assert (NO_GIT_HISTORY_NOTICE in err) == result["no_git_history"]
     assert not (result["shallow_history"] and result["no_git_history"])

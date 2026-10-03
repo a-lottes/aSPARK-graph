@@ -107,3 +107,11 @@ def test_shallow_clone_warning_ac_3_1_readme_quotes_real_stderr(tmp_path, capsys
         assert line in README
     for term in ("shallow_history", "no_git_history", "git fetch --unshallow"):
         assert term in README
+
+
+def test_shallow_clone_warning_t15_no_blanket_graph_json_claim():
+    """US-5 changes a shallow build's graph.json; the README must not say it
+    stays the same in general, and must say shallow builds only lose links."""
+    flat = " ".join(README.split())
+    assert "and `graph.json` stay the same" not in flat
+    assert "never extra ones" in flat

@@ -194,3 +194,82 @@ def test_history_state_makes_exactly_one_local_git_call(origin, tmp_path, monkey
         assert len(calls) == 1
         assert calls[0][0] == "rev-parse"
         assert not any(w in a for a in calls[0] for w in ("fetch", "remote", "clone", "pull", "://"))
+
+
+# --- shallow-clone-warning T11: read_history boundary set, log_records(skip=) ---
+
+from conftest import make_boundary_origin  # noqa: E402
+
+
+def _rev(root, rev):
+    return subprocess.run(["git", "-C", str(root), "rev-parse", rev],
+                          check=True, capture_output=True, text=True).stdout.strip()
+
+
+@pytest.fixture
+def boundary_origin(tmp_path):
+    return make_boundary_origin(tmp_path / "origin")
+
+
+def test_read_history_full_repo_has_empty_boundary(boundary_origin):
+    h = gitmod.read_history(boundary_origin)
+    assert (h.state, h.boundary) == ("full", frozenset())
+
+
+def test_read_history_depth1_boundary_is_the_tip(boundary_origin, tmp_path):
+    clone = shallow_clone(boundary_origin, tmp_path / "c")
+    assert gitmod.read_history(clone).boundary == {_rev(clone, "HEAD")}
+
+
+def test_read_history_depth3_boundary_is_the_oldest_kept_commit(boundary_origin, tmp_path):
+    clone = shallow_clone(boundary_origin, tmp_path / "c", "--depth", "3")
+    assert gitmod.read_history(clone).boundary == {_rev(clone, "HEAD~2")}
+
+
+def test_read_history_subdir_of_shallow_clone_reads_the_same_boundary(boundary_origin, tmp_path):
+    clone = shallow_clone(boundary_origin, tmp_path / "c", "--depth", "3")
+    assert gitmod.read_history(clone / "src").boundary == gitmod.read_history(clone).boundary  # R8
+
+
+def test_read_history_none_shapes_have_empty_boundary(tmp_path, monkeypatch):
+    _no_enclosing_repo(monkeypatch, tmp_path)
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    assert gitmod.read_history(plain) == gitmod.GitHistory("none", frozenset())
+
+
+@pytest.mark.parametrize("content", [None, "", "not-a-sha\n", "abc123\n"])
+def test_read_history_unreadable_boundary_is_none(tmp_path, monkeypatch, content):
+    """C12: shallow, but the graft list is missing, empty or malformed → None, no raise."""
+    marker = tmp_path / "shallow-marker"
+    if content is not None:
+        marker.write_text(content)
+    monkeypatch.setattr(gitmod, "_run", lambda root, args: (0, f"true\ntrue\n{marker}\n"))
+    assert gitmod.read_history(tmp_path) == gitmod.GitHistory("shallow", None)
+
+
+def test_read_history_accepts_sha256_lines(tmp_path, monkeypatch):
+    marker = tmp_path / "shallow-marker"
+    sha = "a" * 64
+    marker.write_text(sha + "\n")
+    monkeypatch.setattr(gitmod, "_run", lambda root, args: (0, f"true\ntrue\n{marker}\n"))
+    assert gitmod.read_history(tmp_path).boundary == {sha}
+
+
+def test_read_history_is_one_local_rev_parse(boundary_origin, tmp_path, monkeypatch):
+    clone = shallow_clone(boundary_origin, tmp_path / "c")
+    calls = []
+    real = gitmod._run
+    monkeypatch.setattr(gitmod, "_run", lambda root, args: (calls.append(args), real(root, args))[1])
+    gitmod.read_history(clone)
+    assert len(calls) == 1 and calls[0][0] == "rev-parse"
+    assert not any(w in a for a in calls[0] for w in ("fetch", "remote", "clone", "pull", "://"))
+
+
+def test_log_records_skip_drops_exactly_that_commit(boundary_origin):
+    tip = _rev(boundary_origin, "HEAD")
+    everything = gitmod.log_records(boundary_origin)
+    skipped = gitmod.log_records(boundary_origin, skip=frozenset({tip}))
+    assert everything[0]["message"].startswith("T1: add a")  # newest first
+    assert skipped == everything[1:]
+    assert all(set(r) == {"message", "files"} for r in skipped)
