@@ -63,7 +63,7 @@ class BuildReport:
     # current-artifact-names US-4: legacy .spark/ files ignored because their current
     # name exists (build output only, never graph content).
     shadowed: list[str] = field(default_factory=list)
-    # shallow-clone-warning: git.history_state() of the build root, checked only
+    # shallow-clone-warning: git.read_history().state of the build root, checked only
     # when the graph has >=1 plan Task (C5); None means "not checked". Build
     # output only, never graph content (C4).
     git_history: str | None = None

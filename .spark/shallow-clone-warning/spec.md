@@ -29,7 +29,9 @@
   a full clone, and `impact src/aspark_graph/queries.py` gave **40 stories / 181 ACs**
   against **4 / 17**. v0.7.1 behaves the same, so the bug is pre-existing. The
   earlier evidence (2026-09-29: 2 stories / 8 ACs on `--depth 1`) held only because
-  the tip then was a merge commit, which `--no-merges` skips. Either way the wrong
+  the tip then was a merge commit whose message ("Merge pull request #6") names no task
+  id. A grafted merge shows no parents, so `--no-merges` does not skip it; it links
+  nothing only because its message matches no task (review r2, F7). Either way the wrong
   answer looks complete.
 - **Goal:** Truncated history only ever loses inferred links and never invents them.
   Anyone who builds without full git history learns this during the build, from the

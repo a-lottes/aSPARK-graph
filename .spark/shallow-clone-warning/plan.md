@@ -76,7 +76,7 @@
 - **Alternatives considered:**
   | Alternative | Why rejected |
   |---|---|
-  | Treat a parentless commit (`%P` empty) in a shallow repo as the boundary, with no file read | It also drops a genuine root inside a shallow repo (multi-root history, `--shallow-since`), and git's rendering of a grafted *merge* is unverified: the round-1 evidence shows a grafted merge tip still skipped by `--no-merges`, so git may report its real parents. The shallow file is git's own list of grafts. |
+  | Treat a parentless commit (`%P` empty) in a shallow repo as the boundary, with no file read | It also drops a genuine root inside a shallow repo (multi-root history, `--shallow-since`), and a grafted *merge* also shows no parents (observed in review r2, F7: `b215790` at `--depth 1` is kept by `--no-merges` with all 132 files), so a parent test cannot tell a graft from a real root. The shallow file is git's own list of grafts. |
   | A second git call (`cat-file`/`rev-list --boundary`, or a separate `rev-parse --git-path`) | Breaks C12/NFR-1 (one shared call). |
   | Drop *all* inferred edges whenever the repo is shallow | Violates AC-5.3 (the newer kept commits must keep their edges). It is used only as the C12 fallback. |
   | Drop commits touching more than N files | A heuristic that also changes full repos, which violates AC-5.5/NFR-4 (§6 keeps bulk commits as v0.7.1). |
@@ -215,7 +215,7 @@ map to US-1. Five commits:
 | R8: `--git-path` prints a relative path for some layouts (subdir, worktree) | Shallow file not found → C12 drops *all* inferred edges, losing too much | `Path(root) / out` handles relative and absolute output. T11 asserts the subdir-of-shallow boundary equals the root's |
 | R9: git's reaction to a corrupt shallow file is unverified: `rev-parse` may fail (→ `none`, no-git notice) or `log` may fail (→ 0 edges) | Notice may name "no git" for a corrupt shallow repo | C12 holds on every path (no edges, no raise). T13(b) asserts what git does rather than guessing. A7 already classes a corrupt `.git` as no git |
 | R10: NFR-1 margin was thin (+3.2%, F2) | NFR-1 fail | The redundant `is_git_repo` in inference is removed (3 calls = v0.7.1). The file is read only when shallow. T16 re-times |
-| R11: AC-5.6 needs a non-merge tip on this repo | A merge tip passes vacuously (`--no-merges`) | T16 records the tip SHA and checks `git rev-list --parents -n1` shows one parent |
+| R11: AC-5.6 needs a non-merge tip on this repo | A merge tip whose message names no task id passes vacuously (it links nothing either way) | T16 records the tip SHA and checks `git rev-list --parents -n1` shows one parent |
 
 ---
 
@@ -247,6 +247,12 @@ map to US-1. Five commits:
 
 - **T16, v0.7.1 baseline from review round 1's `git archive` export of `b215790`,**
   not a new detached worktree. It is the same code.
+
+- **T10 fixture shape (review r2, F6).** `make_boundary_origin` differs from §3's
+  description: c1 adds only the trail, c2 adds `src/b.py`, c3 "T2: change b" modifies it,
+  c4 "T2: add c" adds `src/c.py`, c5 "T1: add a" (the tip) adds `src/a.py`. It meets
+  every spec condition (≥5 commits, ≥3 files, a single-file non-merge T1 tip, c3 alone
+  gives T2→b.py), and the reviewer accepted it.
 
 ## Increment record (for `/peer-review`)
 

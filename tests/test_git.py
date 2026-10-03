@@ -228,7 +228,8 @@ def test_read_history_depth3_boundary_is_the_oldest_kept_commit(boundary_origin,
 
 def test_read_history_subdir_of_shallow_clone_reads_the_same_boundary(boundary_origin, tmp_path):
     clone = shallow_clone(boundary_origin, tmp_path / "c", "--depth", "3")
-    assert gitmod.read_history(clone / "src").boundary == gitmod.read_history(clone).boundary  # R8
+    sub = gitmod.read_history(clone / "src").boundary
+    assert sub == gitmod.read_history(clone).boundary == {_rev(clone, "HEAD~2")}  # R8, not None == None
 
 
 def test_read_history_none_shapes_have_empty_boundary(tmp_path, monkeypatch):
