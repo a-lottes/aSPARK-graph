@@ -69,7 +69,7 @@ def _walk_container(node: Node, parent: str | None, result: FileExtraction, top_
         elif t == "global_statement" and top_level:
             for inner in child.named_children:
                 if inner.type == "local_function_statement":
-                    _add_function(inner, None, result, True)
+                    _add_function(inner, None, result, False)
 
 
 def _add_using(node: Node, result: FileExtraction) -> None:
@@ -130,7 +130,9 @@ def _add_function(node: Node, parent: str | None, result: FileExtraction, defaul
             kind="Function",
             line=node.start_point[0] + 1,
             parent=parent,
-            exported=False if is_local and parent else _is_exported(node, default=default_exported),
+            # A local function (nested or top-level-statement) is never visible
+            # outside its scope, whatever modifiers (`static`, `async`) it carries.
+            exported=False if is_local else _is_exported(node, default=default_exported),
         )
     )
     body = node.child_by_field_name("body")
@@ -139,8 +141,13 @@ def _add_function(node: Node, parent: str | None, result: FileExtraction, defaul
 
 
 def _add_local_functions(node: Node, parent: str, result: FileExtraction) -> None:
-    for child in node.named_children:
+    # Iterative pre-order walk (same visiting order as recursion): a method body
+    # can nest ~1000 levels deep (long `+` chains, fluent calls), which would
+    # exceed Python's recursion limit and crash the whole build.
+    stack = list(reversed(node.named_children))
+    while stack:
+        child = stack.pop()
         if child.type == "local_function_statement":
             _add_function(child, parent, result, False)
         elif child.type not in _TYPE_KINDS and child.type not in _FUNCTION_KINDS:
-            _add_local_functions(child, parent, result)
+            stack.extend(reversed(child.named_children))

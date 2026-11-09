@@ -65,6 +65,10 @@ def _artifacts_section() -> str:
     return m.group(1)
 
 
+def test_current_names_ac_6_1_no_stale_five_language_count():  # csharp-support review F7
+    assert not re.search(r"\bfive\b", README, re.IGNORECASE)
+
+
 def test_current_names_ac_6_1_languages_stated():
     normalized = " ".join(README.split())
     assert "Python, TypeScript/JavaScript, Java, Go, Rust and C#" in normalized

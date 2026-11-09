@@ -140,6 +140,15 @@ def test_csharp_top_level_statements_local_function(tmp_path):
     assert graph.has_node(fn)
     edges = {(e["source"], e["target"], e["type"]) for e in graph.edges()}
     assert (file_id("Program.cs"), fn, "contains") in edges
+    assert graph.get_node(fn)["exported"] is False  # a local function is never exported
+
+
+def test_csharp_deeply_nested_method_body_does_not_crash():  # review F1: NFR-8, no RecursionError
+    concat = " + ".join(['"a"'] * 3000)
+    fluent = "b" + "".join(f".A{i}()" for i in range(1500))
+    source = f"class K {{ string M() {{ var r = {fluent}; void L() {{}} return {concat}; }} }}".encode()
+    quals = {d.qualname for d in code_csharp.extract("K.cs", source).definitions}
+    assert quals == {"K", "K.M", "K.M.L"}
 
 
 # --- T8: resolution edge cases ----------------------------------------------
