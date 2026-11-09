@@ -32,11 +32,12 @@ wheels = [
 
 [[package]]
 name = "aspark-graph"
-version = "0.7.2"
+version = "0.7.3"
 source = { editable = "." }
 dependencies = [
     { name = "mcp" },
     { name = "networkx" },
+    { name = "pydantic" },
     { name = "tree-sitter" },
     { name = "tree-sitter-go" },
     { name = "tree-sitter-java" },
@@ -54,6 +55,7 @@ dev = [
 requires-dist = [
     { name = "mcp", specifier = ">=1.12,<1.20" },
     { name = "networkx", specifier = ">=3.2" },
+    { name = "pydantic", specifier = "<2.14" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "tree-sitter", specifier = "==0.26.0" },
     { name = "tree-sitter-go", specifier = "==0.25.0" },
