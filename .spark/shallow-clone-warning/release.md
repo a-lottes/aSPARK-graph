@@ -5,17 +5,17 @@
 | **Phase** | Keep |
 | **Owner** | Release Manager (`/go-live`) |
 | **Input** | `review.md` (`passed`, round 2), `qa.md` (`passed`, round 1) |
-| **Status** | `preparing` |
+| **Status** | `released` |
 | **Version** | v0.7.2 (patch, spec C6: one new stderr notice, two new always-present MCP keys, no breaking change) |
 | **Date** | 2026-10-03 |
-| **Commit** | pending: the tag goes on the PR's merge commit after merge; release commit on the branch `699b02e70df9b3c093eaa7e8dadda1fe5af79a7b` |
-| **PR** | https://github.com/a-lottes/aSPARK-graph/pull/8 (open, `feat/shallow-clone-warning` → `main`; not merged) |
+| **Commit** | `39ed92cb1b04eefed53a800bed7ca1cbdeda94aa` (merge of PR #8, tagged `v0.7.2`); release commit `699b02e` |
+| **PR** | https://github.com/a-lottes/aSPARK-graph/pull/8 (merged) |
 | **Ticket** | none |
 
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status` and `Version`).
-- **Summary:** v0.7.2 release commit `699b02e` pushed on `feat/shallow-clone-warning`, PR #8 open to `main`; pre-flight green; not merged, tagged or uploaded.
-- **Open:** `1 outstanding`: merge of PR #8 and the PyPI upload (the user), then tag and GitHub release (§3, steps 3–7).
+- **Summary:** v0.7.2 released 2026-11-09: PR #8 merged as `39ed92c`, uploaded to PyPI, tagged, GitHub release created. The post-release smoke check found that a fresh install's MCP server crashes on pydantic 2.14 (pre-existing since 0.7.1, not caused by this release); fixed in v0.7.3.
+- **Open:** `none` for this release. The MCP/pydantic incompatibility ships as hotfix v0.7.3 (branch `fix/pydantic-cap`).
 - **Binding ruling:** §3 Release Actions and the KEEP GATE below carry the final ruling.
 - **On conflict:** the numbered body below wins for everything except `Status`/`Version`.
 
@@ -58,14 +58,14 @@ Run 2026-10-03 on `699b02e` (code identical to the gated `c144cb0` plus the vers
 
 ## 3. Release Actions
 
-Steps 1–2 done with the user's go (2026-10-03); steps 3–7 are still pending. No local tag: the established flow (v0.7.1) tags the merge commit after the PR merges.
+Steps 1–2 done with the user's go (2026-10-03); steps 3–7 done step by step with the user's go (2026-11-09), after the go-live was resumed and re-verified from the repo: PR #7 (README only) had merged before #8, so the full suite (387 passed), `-m slow` (3 passed) and `uv build` (sdist allowlist only) were re-run on a fresh clone of `39ed92c`.
 
 | Action | Result |
 |---|---|
-| Version bump & tag | 0.7.2 committed as `699b02e` (pyproject.toml, uv.lock, CLAUDE.md trail entry); tag `v0.7.2` pending, goes on the merge commit |
-| PR / merge | branch pushed to `origin/feat/shallow-clone-warning`; PR #8 opened: https://github.com/a-lottes/aSPARK-graph/pull/8; merge (merge commit) is the user's |
-| Deploy | pending: PyPI upload of 0.7.2 by the user (twine, their token), built from the merge commit |
-| Post-release smoke check | pending: after the upload |
+| Version bump & tag | 0.7.2 committed as `699b02e`; annotated tag `v0.7.2` on merge commit `39ed92c`, pushed |
+| PR / merge | PR #8 merged by the user as `39ed92c`; GitHub release: https://github.com/a-lottes/aSPARK-graph/releases/tag/v0.7.2 (Latest) |
+| Deploy | PyPI upload by the user (`uv publish`, their token; first try 403 on the token, second try OK), built from `39ed92c`; PyPI sha256 equals the local build: wheel `3e4d9e6e…`, sdist `431930e7…` |
+| Post-release smoke check | **partly red.** Fresh 3.11 venv, `pip install aspark-graph==0.7.2`: `build` on a `--depth 1` clone prints the shallow notice once, exit 0 ✅. `serve` crashes on import ❌: the unlocked install resolves pydantic 2.14.3, which removed `eval_type_backport` that mcp 1.19.0 imports. Same crash with 0.7.1 + pydantic 2.14.3 (pre-existing since pydantic 2.14.0, 2026-10-08); with pydantic 2.13.4 `serve` lists 9 tools. Fix: hotfix v0.7.3 caps pydantic |
 
 Pending commands, in order:
 1. Done: `git push -u origin feat/shallow-clone-warning`
@@ -85,6 +85,7 @@ Pending commands, in order:
 
 - **What went well:** review F1 turned a wording question into a real fix (US-5): the evidence showed the notice was pointing the wrong way, and the user picked "fix inference" over a reworded warning. QA checked many odd shallow shapes hands-on (graft lists, SHA-256, worktrees) and found no crash.
 - **What we'd do differently:** test the inference path on a non-merge tip from the start; the first evidence (2/8) was only right by luck, because the tip was a merge. Fix the B1 benchmark before the next slow-suite gate (G11), so a load spike stops being a judgement call.
+- **Learned at release (2026-11-09):** the test suite runs only against `uv.lock`, so it cannot see what a fresh `pip install` resolves. An unbounded transitive dep (pydantic) broke `serve` for every new user for a month unnoticed; only the post-release smoke check on a real PyPI install caught it.
 - **Patterns worth reusing (CLAUDE.md candidates):** "Truncated input should only lose answers, never invent them; when unsure, drop" (C12). For each release, check `origin/main` and open PRs for overlap before the release commit (done here: PR #7 has no conflict).
 
 ---
@@ -93,7 +94,7 @@ Pending commands, in order:
 
 - [x] All pre-flight checks passed at release time (§1, on `699b02e`)
 - [x] Changelog written in user-facing language
-- [ ] Release actions executed and verified: prepared, awaiting the user's go (§3)
+- [x] Release actions executed and verified (§3); smoke check found a pre-existing dependency break, handed to hotfix v0.7.3
 - [x] Learnings recorded
 - [x] Line budget respected: Ist 99 / Soll ~100 (no HTML comments)
-- [ ] Status set to `released`: currently `preparing`
+- [x] Status set to `released` (2026-11-09)

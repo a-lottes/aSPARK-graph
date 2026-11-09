@@ -45,7 +45,10 @@ on stderr and in the MCP `build_graph` booleans `shallow_history`/`no_git_histor
 grafted boundary commits contribute no inferred links, so truncated history only
 loses links; non-shallow graph.json byte-identical to v0.7.1; known limits: git
 < 2.15, monorepo subprojects, `--filter=tree:0` (BACKLOG G11)).
-**Current shipped version: 0.7.2.** Read the relevant trail before changing
+v0.7.3 is a direct hotfix without a `.spark/` trail (user's call): caps `pydantic<2.14`,
+because pydantic 2.14 broke `serve` in every fresh install of 0.7.1/0.7.2 (found by the
+v0.7.2 post-release smoke check; see `.spark/shallow-clone-warning/release.md` §3).
+**Current shipped version: 0.7.3.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention
@@ -106,6 +109,13 @@ each adapter. Never compute an answer in an adapter.
   `mcp.server.fastmcp.FastMCP` + `@mcp.tool()` with the directly-callable-decorator
   contract the in-process test harness relies on. Lift the cap only alongside a real
   auth/remote-transport feature.
+- **`pydantic<2.14` rides with the mcp cap (v0.7.3) — lift them together, never
+  alone.** pydantic 2.14 removed a private helper mcp 1.19 imports at load, so an
+  unlocked install crashed `serve` for a month while the suite (which only sees
+  `uv.lock`) stayed green. `tests/test_fresh_install.py` (slow) installs the built
+  wheel into a fresh venv **without the lock** and boots `serve` — the only test
+  that sees what a new user's resolve picks. Every release's post-release smoke
+  check must also hit `serve` from a real PyPI install, not just `build`.
 - **Test fixtures are marked, never bypassed (confinement, v0.6.0).** A test that
   needs an unmarked directory builds its own `.git`-marked subdirectory; there is
   no environment variable, flag, or tool parameter that disables the confinement
@@ -227,7 +237,7 @@ aspark-graph query gate_health aspark-graph
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
 uv run pytest                # 319 tests; keep green
-uv run pytest -m slow        # 3 slow tests: NFR-1 bench, MCP transport smoke, sdist manifest
+uv run pytest -m slow        # 4 slow tests: NFR-1 bench, MCP transport smoke, sdist manifest, unlocked fresh install
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .
 ```

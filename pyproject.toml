@@ -1,6 +1,6 @@
 [project]
 name = "aspark-graph"
-version = "0.7.2"
+version = "0.7.3"
 description = "A lean, local code-and-artifact knowledge graph that speaks SPARK."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,8 +25,17 @@ keywords = ["mcp", "knowledge-graph", "aspark", "tree-sitter", "code-graph"]
 #    calls the decorated functions directly) relies on. A downstream install
 #    without our uv.lock still resolves an API-compatible mcp (distributable-
 #    install review F2).
+#
+# `pydantic<2.14` (v0.7.3): pydantic 2.14.0 (2026-10-08) removed the private
+# `pydantic._internal._typing_extra.eval_type_backport`, which mcp 1.19's
+# FastMCP imports at module load — so with the mcp cap above, an unlocked
+# install that resolves pydantic 2.14 crashes `aspark-graph serve` on start.
+# The suite never saw it because uv.lock pins pydantic 2.13.4; the slow test
+# `test_fresh_install.py` installs the wheel WITHOUT the lock to catch this
+# class. Lift this cap together with the mcp cap, never alone.
 dependencies = [
     "mcp>=1.12,<1.20",
+    "pydantic<2.14",
     "networkx>=3.2",
     "tree-sitter==0.26.0",
     "tree-sitter-python==0.25.0",
