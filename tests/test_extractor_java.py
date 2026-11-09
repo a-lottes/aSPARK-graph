@@ -54,15 +54,17 @@ def test_all_seven_languages_in_one_build(tmp_path):  # AC-4.1 / go-rust-support
     (tmp_path / "d.go").write_text("package main\n\nfunc D() int { return 1 }\n")
     (tmp_path / "e.rs").write_text("pub fn e() -> i32 { 1 }\n")
     (tmp_path / "F.cs").write_text("namespace N { public class F { public void M() {} } }\n")
+    (tmp_path / "g.js").write_text("function h() { return 1; }\n")
     graph, _ = build_graph(tmp_path)
     langs = {n.get("language") for n in graph.nodes() if n["type"] == "File"}
-    assert {"python", "typescript", "java", "go", "rust", "csharp"} <= langs
+    assert {"python", "typescript", "javascript", "java", "go", "rust", "csharp"} <= langs
     assert graph.has_node(definition_id("a.py", "f"))
     assert graph.has_node(definition_id("b.ts", "g"))
     assert graph.has_node(definition_id("C.java", "C"))
     assert graph.has_node(definition_id("d.go", "D"))
     assert graph.has_node(definition_id("e.rs", "e"))
     assert graph.has_node(definition_id("F.cs", "F.M"))
+    assert graph.has_node(definition_id("g.js", "h"))
     unparsed = {n["id"] for n in graph.nodes() if n["type"] == "File" and n.get("unparsed")}
     assert unparsed == set()
 

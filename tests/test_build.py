@@ -6,6 +6,7 @@ AC-1.4 (no .spark/ → code-only, zero artifact entities, no error).
 
 from aspark_graph.build import build_graph
 from aspark_graph.graph import Graph, default_graph_path
+from aspark_graph.model import definition_id, file_id
 
 
 def _write_code_repo(tmp_path):
@@ -72,3 +73,12 @@ def test_double_build_byte_identical_at_default_path(tmp_path):  # AC-1.2 via CL
     # And a reload round-trips to the same canonical bytes.
     reloaded = Graph.load(default_graph_path(tmp_path))
     assert reloaded.save(tmp_path / "again" / "graph.json").read_text() == second
+
+
+def test_unlisted_extension_behaviour_unchanged(tmp_path):  # csharp-support AC-3.2 (v0.7.3 behaviour)
+    (tmp_path / "a.py").write_text("def f():\n    return 1\n")
+    (tmp_path / "x.rb").write_text("def x; end\n")
+    graph, report = build_graph(tmp_path)
+    assert graph.has_node(definition_id("a.py", "f"))
+    assert graph.get_node(file_id("x.rb")) is None
+    assert "x.rb" not in report.unparsed

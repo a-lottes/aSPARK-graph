@@ -8,6 +8,11 @@ file is recorded as ``package`` (block-scoped or file-scoped). Partial classes
 across files and generics beyond the bare name are out of scope: a generic type
 is named without its type parameters, and each partial declaration is simply its
 own ``Class`` node in its own file.
+
+``exported`` defaults (best-effort, from modifiers): ``public``/``internal``/
+``protected`` -> True; ``private`` and ``private protected`` -> False. With no
+modifier: a top-level type is True (internal), an interface member is True, and
+a method, nested type or local function is False (private by default).
 """
 
 from __future__ import annotations
@@ -85,10 +90,10 @@ def _modifiers(node: Node) -> set[str]:
 
 def _is_exported(node: Node, default: bool) -> bool:
     mods = _modifiers(node)
+    if "private" in mods:  # also `private protected`: narrowest access wins
+        return False
     if mods & {"public", "internal", "protected"}:
         return True
-    if "private" in mods:
-        return False
     return default
 
 
