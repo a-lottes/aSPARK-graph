@@ -71,7 +71,7 @@ def test_current_names_ac_6_1_no_six_language_count():
 
 def test_current_names_ac_6_1_five_languages_stated():
     normalized = " ".join(README.split())
-    assert "Python, TypeScript/JavaScript, Java, Go and Rust" in normalized
+    assert "Python, TypeScript/JavaScript, Java, Go, Rust and C#" in normalized
 
 
 def test_current_names_ac_6_3_artifact_names_listed():

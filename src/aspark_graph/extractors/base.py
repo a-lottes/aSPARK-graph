@@ -37,7 +37,7 @@ class FileExtraction:
     language: str
     definitions: list[Definition] = field(default_factory=list)
     imports: list[Import] = field(default_factory=list)
-    package: str | None = None  # Java package; None for languages without the notion
+    package: str | None = None  # Java/C# package/namespace; None for languages without the notion
 
 
 # extension -> language name; the build uses this to pick an extractor and to
@@ -53,6 +53,7 @@ EXTENSION_LANGUAGE = {
     ".java": "java",
     ".go": "go",
     ".rs": "rust",
+    ".cs": "csharp",
 }
 
 
