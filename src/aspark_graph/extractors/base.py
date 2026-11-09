@@ -53,6 +53,7 @@ EXTENSION_LANGUAGE = {
     ".java": "java",
     ".go": "go",
     ".rs": "rust",
+    ".cs": "csharp",
 }
 
 
