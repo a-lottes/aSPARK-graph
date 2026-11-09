@@ -43,6 +43,7 @@ dependencies = [
     "tree-sitter-java==0.23.5",
     "tree-sitter-go==0.25.0",
     "tree-sitter-rust==0.24.2",
+    "tree-sitter-c-sharp==0.23.5",
 ]
 
 # Without these, the PyPI page carries no link at all — anyone who finds the

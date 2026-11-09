@@ -239,6 +239,7 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
     java_index = _java_type_index(extractions)
     go_index = _go_package_index(extractions)
     rust_index = _rust_module_index(extractions)
+    cs_index = _csharp_namespace_index(extractions)
     rel_index = {e.relpath for e in extractions}
     for e in extractions:
         src = file_id(e.relpath)
@@ -247,6 +248,12 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
                 # A Go import addresses a package (a directory), not a single
                 # file, so an unambiguous match can fan out to several files.
                 for target_rel in _resolve_go_import(imp, e.relpath, go_index):
+                    if target_rel in rel_index and target_rel != e.relpath:
+                        graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
+                continue
+            if e.language == "csharp":
+                # A `using` names a namespace, which may span several files.
+                for target_rel in _resolve_csharp_using(imp, cs_index):
                     if target_rel in rel_index and target_rel != e.relpath:
                         graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
                 continue
@@ -299,6 +306,32 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
             if d.kind == "Class" and d.parent is None:
                 index.setdefault(f"{prefix}{d.qualname}", e.relpath)
     return index
+
+
+def _csharp_namespace_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
+    """Map a C# namespace (``Acme.Util``) -> the repo files declaring it."""
+    index: dict[str, list[str]] = {}
+    for e in extractions:
+        if e.language == "csharp" and e.package:
+            index.setdefault(e.package, []).append(e.relpath)
+    for files in index.values():
+        files.sort()
+    return index
+
+
+def _resolve_csharp_using(imp, index: dict[str, list[str]]) -> list[str]:
+    """Match a ``using`` target against in-repo namespaces (best-effort).
+
+    ``using Acme.Util;`` matches the namespace itself; ``using static
+    Acme.Util.Helper;`` / ``using X = Acme.Util.Helper;`` name a type, so one
+    trailing segment is dropped if the full name is no namespace. BCL and
+    third-party namespaces match nothing and emit no edge.
+    """
+    name = imp.module
+    if name in index:
+        return index[name]
+    head, _, _ = name.rpartition(".")
+    return index.get(head, []) if head else []
 
 
 def _go_package_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
