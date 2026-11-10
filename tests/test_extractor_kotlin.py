@@ -132,3 +132,39 @@ def test_partial_flag_reaches_file_node_only_when_true(tmp_path):
     nodes = {n["id"]: n for n in graph.nodes()}
     assert nodes[file_id("Bad.kt")].get("partial") is True
     assert "partial" not in nodes[file_id("Good.kt")]
+
+
+def test_comments_and_strings_do_not_confuse_the_retry():  # review F1/F12
+    src = (
+        b"class X { companion object { const val T = 1 } }\n"
+        b"// e.g. items.map { it.id }\n"
+        b"/// Usage: { fun sample()\n"
+        b'val s = "{ fun fake() }"\n'
+        b"class L {\n    fun login() {}\n}\n"
+    )
+    r = code_kotlin.extract("A.kt", src)
+    names = {d.qualname for d in r.definitions}
+    assert names == {"X", "X.Companion", "L", "L.login"}  # nothing invented from comments/strings
+    assert r.partial is False
+
+
+def test_valid_one_line_members_are_not_flagged_partial():  # review F13
+    for body in (
+        b"data class D(val a: Int) { fun f() = a }\n",
+        b"enum class E { A, B; fun h() {} }\n",
+        b"class X { fun y() = list.map { it + 1 } }\n",
+    ):
+        assert code_kotlin.extract("A.kt", body).partial is False, body
+
+
+def test_partial_files_are_named_on_stderr_and_mcp(tmp_path, capsys):
+    from aspark_graph import cli
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "Bad.kt").write_text("class A{fun g(){}}\nclass B{fun h(){}}\n")
+    (tmp_path / "Good.kt").write_text("class G {\n    fun g() {}\n}\n")
+    assert cli.main(["build", str(tmp_path)]) == 0
+    err = capsys.readouterr().err
+    assert "Partially parsed Bad.kt" in err and "Good.kt" not in err
+    from aspark_graph import server
+    result = server.build_graph(str(tmp_path))
+    assert result["partial_files"] == ["Bad.kt"]

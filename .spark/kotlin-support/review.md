@@ -6,9 +6,9 @@
 |---|---|
 | **Phase** | Review |
 | **Owner** | Reviewer (`/peer-review`) |
-| **Input** | The diff of `/increment` (`git diff dd4b994..HEAD`, commit d3742d9), `.spark/kotlin-support/plan.md` |
+| **Input** | The diff of `/increment` (`git diff dd4b994..HEAD`; fix round 62f3a49 = `git diff d3742d9..HEAD`), `.spark/kotlin-support/plan.md` |
 | **Status** | `changes-requested` |
-| **Round** | 1 |
+| **Round** | 2 |
 | **Date** | 2026-11-10 |
 
 <!-- Handoff: read this block first, the numbered sections below by exception. Whoever
@@ -25,42 +25,49 @@
 
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
-- **Verdict:** Fixes applied by `/increment`, awaiting re-review (F1/F2: one-line-body retry parse, no ERROR walking, `partial` flag).
-- **Open:** `2 open` — Blockers: none; Majors: none (F9 benchmark flake and F10 pre-existing cache-tag nit remain; see §3)
+- **Verdict:** Fixes applied by `/increment` for F1, F12, F13 (comment/string blanking in the retry copy, MISSING-aware error count, stderr + MCP `partial_files`); awaiting re-review.
+- **Open:** `2 open` — Blockers: none; Majors: none (F9 benchmark flake, F10 cache-tag nit; F1, F12, F13 fixed, awaiting re-review)
 - **Binding ruling:** §6 Verdict and the gate checklist below — the only binding location; there is no other round to point to
 - **On conflict:** the numbered body below wins for everything except `Status`; log the mismatch as a finding at the next `/peer-review` and proceed — don't stop on it.
 
 ## 1. Scope
 
-- **Reviewed:** `git diff dd4b994..HEAD` — new `extractors/code_kotlin.py`, `tests/test_extractor_kotlin.py`; modified `extractors/base.py`, `extractors/__init__.py`, `build.py`, `parse_cache.py`, `pyproject.toml`, `uv.lock`, `README.md`, `CLAUDE.md`, `tests/test_readme.py`. `cli.py`/`server.py` untouched (thin-adapter rule held). This file was a placeholder written without a reviewer run; it is fully replaced (no prior `Round` row, so this is round 1).
-- **Mode:** live run — full suite, slow suite, CLI builds of scratch repos, probes of `code_kotlin.extract` against the pinned `tree-sitter-kotlin==1.1.0`, and an old-code-vs-new-code round trip; plus static read. Not degraded for any item below.
-- **Standards applied:** Anti-generosity standard applied (`/opt/aspark/standards/anti-generosity.md`): AC cells are binary. Active lens: `cli` (`/opt/aspark/lenses/cli.md`).
-- **Graph (aspark-graph MCP):** `staleness` fresh (65 files, nothing changed). `impact --diff dd4b994..HEAD`: `code_kotlin.py`, `parse_cache.py` and `test_extractor_kotlin.py` have no linked stories because the plan declares no `files:` notes (empty by construction, not an all-clear). `build.py`/`base.py` reach 19 stories from earlier features, so I read `build.py:197-305` and ran the determinism round trip. `test_readme.py` reaches `current-artifact-names` US-6 (declared), so I read that spec's AC-6.1 and found F5. `story_trace US-1`: T1 has `code: []`; its QA leg was not used (tool rule).
-- **Not reviewed:** `qa.md` (QA's artifact). Pre-existing code outside the diff is only covered where it was observed (F9, F10).
+- **Reviewed:** the fix round `git diff d3742d9..HEAD` in full: `code_kotlin.py`, `base.py`, `build.py`, `parse_cache.py`, the three test files, `README.md`, `CLAUDE.md` and plan §5. The full feature diff `dd4b994..HEAD` was read again where the fix touched it. `cli.py`/`server.py` are untouched, so the thin-adapter rule still holds.
+- **Mode:** live run against the pinned `tree-sitter-kotlin==1.1.0` (with `tree-sitter==0.26.0`). This covered the full suite, the slow suite, CLI builds of a git-marked scratch Kotlin repo, about 60 hand probes, and a fuzz of 3,900 synthetic snippet combinations against `code_kotlin.extract`. I also mutation-tested the three new tests and built a dd4b994 fixture with the dd4b994 code and with the HEAD code (git worktree), then diffed the two graphs. Not degraded for any item below. Every fix was re-derived from source (condition (a): this round verifies those fixes), not taken from `/increment`'s account.
+- **Standards applied:** Anti-generosity standard applied (`/opt/aspark/standards/anti-generosity.md`): AC cells are binary. Active lens: `cli` (`/opt/aspark/lenses/cli.md`). Tool file: `/opt/aspark/tools/aspark-graph.md`.
+- **Graph (aspark-graph MCP):** queried after the coordinator rebuilt the graph (the qa.md drift fix). `staleness` was fresh (65 files). `impact --diff d3742d9..HEAD`:
+  - `code_kotlin.py`, `parse_cache.py` and both extractor test files have no linked stories. The plan declares no `files:` notes, so this is empty by construction, not an all-clear.
+  - `build.py`/`base.py` reach 16 stories from earlier features. As a result I read `build.py:150-175` and `build.py:240-345` and ran the old-vs-new round trip.
+  - `test_build.py` reaches security-posture US-1 (declared). As a result I read `test_build.py:51-62`.
+  - `README.md`/`CLAUDE.md` appear in `unknown_files` (not indexed), so I read them by hand.
+  - `story_trace US-1 --feature kotlin-support`: T1 has `code: []`. Its QA leg was not read (tool rule).
+- **Not reviewed:** `qa.md` (QA's artifact, left untouched). Pre-existing code is covered only where I observed it (F9, F10). Note for QA: the parse-cache tag (`parse_cache.py:38-45`) is the same at d3742d9 and HEAD (both 0.7.3 with the same grammar). A scratch repo built during round 1 will reuse round-1 Kotlin extractions, so build QA fixtures fresh or with `--full`.
 
 ## 2. Plan Conformance
 
 | Task | Implemented as planned? | Note |
 |---|---|---|
-| T1 | ✅ | Pure extractor, registry + `.kt`/`.kts` mapping, `==1.1.0` pin, cache tag (`parse_cache.py:44`) as planned. But plan §5 risk claim "real multi-line code parses cleanly" is false (F8). |
-| T2 | ✅ | `_kotlin_symbol_index`/`_resolve_kotlin_import` (`build.py:307-335`): exact, then walk-up; wildcard gets no edge. Matches the plan. |
-| T3 | ❌ | As delivered: README:318 still said "five"; the existing double-build test did not cover Kotlin, so AC-3.1 had no regression guard. Both fixed by the reviewer (F5, F7). The "six-language build test" is a copy rather than an extension of the existing test (F11). |
+| T1 | ✅ | Implemented as the rewritten plan §5 describes: same-length retry, no ERROR walking, `partial` flag. Its correctness gaps are tracked in §4 and F1/F12/F13. |
+| T2 | ✅ | Exact name first, then walk-up; wildcards get no edge. The fan-out to every defining file (`build.py:248-258`, `311-327`) is a deviation, recorded in plan §5. |
+| T3 | ✅ | README limit added (`README.md:275-278`). Duplicate test removed and the Java test renamed (F11). AC-3.1 guard in `test_build.py:59`. |
 
 ## 3. Findings
 
 | # | Severity | Location | Finding | Status |
 |---|---|---|---|---|
-| F1 | Major | `extractors/code_kotlin.py:72-74` (grammar) | On the pinned grammar, a one-line `class X { companion object { const val T = "x" } }` turns the rest of the file into an ERROR node with no recoverable children. Probe: Android-style `Login.kt` with that line before `class LoginViewModel { fun login() }` and a top-level `fun formatUser` gives **0 definitions**. The build reports success and says nothing on stderr. **Why it matters:** this is a common idiom. Every type/function after it disappears silently, and imports *into* that file resolve nowhere, so `impact` under-reports. **Fix:** check `tree.root_node.has_error`, record the file as partial (e.g. `report.partial` plus a stderr line naming it, like the shallow-clone note), and list the limit in README "Supported languages". Also assess a newer grammar. This needs a design decision. | fixed |
-| F2 | Major | `extractors/code_kotlin.py:72-74` | ERROR recovery walks the ERROR with the *outer* parent. When the ERROR swallowed a type header, that type's members become top-level. Probe: `package p` + `object Keys { fun key() = 1 }` + `object Other { fun o() = 2 }` yields only `key` with `parent=None` (fabricated top-level `p.key`, also entered in `_kotlin_symbol_index`); `Keys`, `Other` and `o` are lost. Same for `class A { fun g() {} }` followed by `class B { … }`. **Why it matters:** this is a wrong graph fact, not an honest absence (constitution §1). **Fix:** do not emit definitions from an ERROR that directly holds an `identifier`/type keyword before them, or emit nothing from ERROR at the top level. Add regression tests for both probes. | fixed |
-| F3 | Minor | `build.py:318` | `index.setdefault` is first-writer-wins. A top-level function name defined in two files of one package (common for extension overloads: `fun String.toast()` in `Ext.kt`, `fun Int.toast()` in `MoreExt.kt`) resolves only to the first file. Probe: `import com.ex.util.toast` produced an edge to `Ext.kt` only. **Why it matters:** an incomplete blast radius. **Fix:** map name → list of files and fan out, like `_go_package_index`. | fixed |
-| F4 | Minor | `tests/test_extractor_kotlin.py:91-102` | `topLevel` lives in the same file as `Helper`, so the function-import path of AC-2.1 is never isolated. A change that indexed only classes would still pass. There is also no test for ERROR recovery or one-line bodies (F1/F2). **Fix:** put `topLevel` in its own file and assert that edge. Add the F1/F2 probes as tests. | fixed |
-| F5 | Minor | `README.md:318`, `tests/test_readme.py:69` | README said "Languages beyond the **five** currently supported". The diff had loosened the guard regex to `five[^.]{0,20}(languages|grammars)`, which misses this sentence. Fixed: "six", and the guard now forbids any `\bfive\b`. Mutation-checked: it fails on the unfixed README. | fixed |
-| F6 | Nit | `CLAUDE.md:81` | "the five tree-sitter grammars + core" was stale after the diff updated line 8. Fixed to "six". | fixed |
-| F7 | Minor | `tests/test_build.py:51`, `tests/test_extractor_kotlin.py:105` | AC-3.1 (byte-identical rebuild) had no Kotlin file in any double-build test, and AC-1.1's "not `unparsed`" was never asserted. Fixed: added `K.kt` (with a companion) to the double-build test, and added an `unparsed == set()` assertion. | fixed |
-| F8 | Minor | `.spark/kotlin-support/plan.md:25` | The risk section says the issue is limited to one-line class bodies and that "real multi-line code parses cleanly" with recovery. F1/F2 show one line breaks the rest of a multi-line file, and recovery mis-parents. **Fix (EM):** correct the risk statement and record F1's limit in BACKLOG. | fixed |
-| F9 | Minor | `tests/test_incremental_bench.py:97` | NFR-1 bench (slow) fails intermittently on this machine: new code 48.3/50.9/49.6 %, **pre-change code** (dd4b994) 49.4/54.3 %, against a target ≥50 %. This is not caused by this diff, but the constitution §4 bar "stays passing" is not demonstrably held here. **Fix (EM):** re-run on the release machine or revisit the margin before `/go-live`. | open |
-| F10 | Nit | `parse_cache.py:38-45` | Pre-existing: the cache version tag lists the python/typescript/java/kotlin grammars but not go/rust. A go/rust pin bump without an aspark-graph version bump would reuse stale extractions. **Fix:** add both to the tag. | open |
-| F11 | Nit | `tests/test_extractor_java.py:50`, `tests/test_extractor_kotlin.py:105` | Two tests named `test_all_six_languages_in_one_build`. The Java one covers five languages. The Kotlin one is a copy-paste duplicate. **Fix:** extend one, delete the other. | fixed |
+| F1 | Major | `extractors/code_kotlin.py:32-38,51-54`; `cli.py:162-184` | Round 2: the retry repairs the round-1 probe (`Login.kt`: all 5 definitions, line numbers correct). But the regex also rewrites `//` comments, which turns comment text into code. Probe: `class Keys { companion object { const val A = "a" } }` plus `// e.g. items.map { it.id }` (or `// response: { "id": 1 }`) anywhere in the file, before or inside a class, gives **0 definitions for the whole file**, including `Keys`. The retry has 1 error and the original has 1, so the original parse is kept. The file gets `partial: true`, but the build prints nothing and `impact` does not surface the flag. Only `get_node`/`find_nodes` show it. **Why it matters:** this is the same silent under-reporting as in round 1, triggered by a common comment pattern. **Fix:** (a) in the retry copy, overwrite the bodies of `//`/`/* */` comments and string literals with spaces (same length, offsets kept) before normalising. This also fixes F12. (b) Name partial files on stderr, as the shallow-clone notice does (cli lens §2), and expose them in the MCP `build_graph` result. | fixed |
+| F2 | Major | `extractors/code_kotlin.py:97-108` | ERROR recovery walked an ERROR node with the outer parent: members of a swallowed type became fabricated top-level definitions. Round 2: ERROR nodes are no longer walked. The `Keys`/`Other` and `A`/`B` probes are now correct, with the right parents. Restoring the ERROR walk fails `test_unparseable_file_is_partial_and_never_mis_parented` (mutation-checked). The fuzz found no mis-parented real definitions. | fixed r2 |
+| F3 | Minor | `build.py:311-327` | An import resolved only to the first file defining the name (`setdefault`). Round 2: names map to a list of files. In the scratch repo, `import com.ex.util.toast` produces edges to both `Ext1.kt` and `Ext2.kt`. | fixed r2 |
+| F4 | Minor | `tests/test_extractor_kotlin.py:86-134` | The function-import path was not isolated, and there were no F1/F2 tests. Round 2: `topLevel` is in its own file and the edge set is asserted by equality. The one-line-body test and the partial tests fail when the retry is removed or `partial` is never set (mutation-checked). | fixed r2 |
+| F5 | Minor | `README.md:321`, `tests/test_readme.py:69-70` | Stale "five" count and a weakened guard (reviewer fix, round 1). Round 2: no `five` in the README, and the guard is still `\bfive\b`. | fixed r2 |
+| F6 | Nit | `CLAUDE.md:81` | "five tree-sitter grammars" (reviewer fix, round 1). Round 2: the line now says "six". | fixed r2 |
+| F7 | Minor | `tests/test_build.py:59`, `tests/test_extractor_kotlin.py` | AC-3.1/AC-1.1 assertions were missing (reviewer fix, round 1). Round 2: `K.kt` is in the double-build test and `unparsed == set()` is asserted. | fixed r2 |
+| F8 | Minor | `.spark/kotlin-support/plan.md:25` | The risk statement understated F1/F2. Round 2: §5 was rewritten and the limit is in the README (this repo has no BACKLOG file). The sentence "Residual: … honest absence" is contradicted by F12; correct it together with F12. | fixed r2 |
+| F9 | Minor | `tests/test_incremental_bench.py:97` | Pre-existing: the NFR-1 benchmark (slow) is flaky on this machine. Round 2: two full slow runs passed, then the benchmark alone failed once and passed once. **Fix (EM):** settle it on the release machine before `/go-live`. | open |
+| F10 | Nit | `parse_cache.py:38-45` | Pre-existing: the cache tag does not include the go/rust grammar versions. Round 2: unchanged. **Fix:** add both to the tag. | open |
+| F11 | Nit | `tests/test_extractor_java.py:50` | Duplicate `test_all_six_languages_in_one_build`. Round 2: the Java test is renamed `test_all_languages_in_one_build` and covers Kotlin; the Kotlin copy is deleted. | fixed r2 |
+| F12 | Minor | `extractors/code_kotlin.py:32-38` | The retry can **fabricate** a definition from a comment and not flag the file. Probe: a one-line companion plus `/// Usage: { fun sample()` (an opening brace in the comment with no closing `}` on that line) emits a top-level Function `sample` with `partial=False`. In the fuzz, 1,338 of 3,900 combinations containing such a comment fabricated `ghost`/`H.ghost`. **Why it matters:** a wrong graph fact (constitution §1). Rated Minor, not Major, because it needs an unclosed `{ decl…` comment. A closed `{ … }` comment loses data instead (F1). **Fix:** the same as F1(a); add the probe as a test. | fixed |
+| F13 | Minor | `extractors/code_kotlin.py:41-46,53,56` | `_error_count` never counts MISSING nodes, because the grammar's hidden `_class_member_semi` is not returned by `children` or by a cursor. Valid one-liners such as `data class D(val a: Int) { fun f() = a }`, `enum class E { A, B; fun f() = 1 }`, `interface I { fun a(); fun b() }`, and one-line `when`/`if-else`/lambda bodies score 0 versus 0. The clean retry is rejected and the file is flagged `partial: true`, although the definitions are complete. **Why it matters:** false positives make the flag meaningless, and README:276 says such a file "cannot parse". **Fix:** prefer the retry when `not retry.root_node.has_error`. Land this only after F1(a): until then, a clean retry can carry a fabricated `object Fake` from a comment. | fixed |
 
 ## 4. Requirements Traceability
 
@@ -69,30 +76,45 @@ The spec has no NFRs. Anti-generosity binary grading applies to every cell.
 | Spec ID | Implemented at | Verdict |
 |---|---|---|
 | AC-1.1 | `extractors/base.py:56-57`, `extractors/__init__.py:25` | ✅ PASS — CLI build of scratch repo: `.kt`, `build.gradle.kts`, empty, random-bytes and bad-UTF-8 `.kt` all `language=kotlin`, no `unparsed`, exit 0 |
-| AC-1.2 | `extractors/code_kotlin.py:63-110` | ❌ FAIL — correct for multi-line class/data/object/interface/enum/sealed/`fun interface`/nested/inner/companion, but valid Kotlin with one-line bodies loses or mis-parents types (F1, F2) |
-| AC-1.3 | `extractors/code_kotlin.py:78-96` | ❌ FAIL — extension, generic, companion, suspend/operator and backtick names are correct; the same inputs as AC-1.2 drop or fabricate functions (F1, F2) |
-| AC-2.1 (Should) | `build.py:307-335` | ✅ PASS — live: class, alias (`as H`) and top-level-function imports give File→File edges; overload fan-out is missing (F3) |
+| AC-1.2 | `extractors/code_kotlin.py:49-67,97-146` | ❌ FAIL — the round-1 probes now pass, but valid Kotlin with a one-line companion and a `// … { … }` comment yields no `Class` nodes at all (F1) |
+| AC-1.3 | `extractors/code_kotlin.py:111-130` | ❌ FAIL — the same input drops every function (F1), and a comment can produce a fabricated `Function` node (F12) |
+| AC-2.1 (Should) | `build.py:248-258,311-341` | ✅ PASS — live: class, alias, isolated top-level-function and overloaded-function imports give File→File edges; overloads fan out to both files (F3 fixed) |
 | AC-2.2 (Should) | `build.py:328-329` | ✅ PASS — live: `com.ex.util.*` and `kotlinx.coroutines.launch` give no edge; a `*` inside a comment is not read as a wildcard |
-| AC-3.1 | `pyproject.toml:46`, `uv.lock` | ✅ PASS — `==1.1.0`. Scratch repo: build, incremental and `--full` are byte-identical. dd4b994 fixture: old code vs new code `aafe108d…` identical |
-| AC-3.2 | `tests/test_extractor_kotlin.py` | ✅ PASS — 6 tests at Java granularity, plus a multi-language build test with Kotlin (weak spots: F4, F11) |
-| AC-3.3 | `README.md:272-275`, `README.md:298-299` | ✅ PASS — Kotlin is listed in "Supported languages" and the design guarantees. The stale out-of-scope count was fixed (F5) |
+| AC-3.1 | `pyproject.toml:46`, `uv.lock` | ✅ PASS — `==1.1.0`. Scratch repo with a partial file: build, cached rebuild and `--full` all give `8ff4ef96…`, and `partial` survives the cache. dd4b994 fixture: dd4b994 code and HEAD code both give `fb4e60cc…` |
+| AC-3.2 | `tests/test_extractor_kotlin.py` | ✅ PASS — 8 Kotlin tests plus Kotlin in both multi-language tests; the new tests fail under the mutations listed in §5 |
+| AC-3.3 | `README.md:272-278`, `README.md:298-299` | ✅ PASS — Kotlin is listed in "Supported languages" and the design guarantees. The stale out-of-scope count was fixed (F5) |
 
 ## 5. What Was Checked
 
-- [x] Correctness: probed about 40 Kotlin snippets against the pinned grammar (annotations on their own line, `@file:`, generics/reified, `fun interface`, sealed class/interface, secondary/`@Inject` constructors, top-level `val`/`const`/`by lazy`, Gradle `.kts` and shebang, nested/inner/named and unnamed companion, wildcard/alias/backtick imports, enum entry bodies, expect/actual, unicode). Failures are F1/F2.
-- [x] Non-functional: determinism (double build, `--full`, stash-style round trip against dd4b994). Constitution non-negotiables: none violated. NFR-1 bench: F9.
-- [x] Error handling: malformed and binary `.kt` files give no traceback and exit 0. The one swallowed failure is F1 (a silent partial parse).
-- [x] Security: no new input path beyond file bytes. `_text` decodes with `errors="replace"`. The 5 MB cap and entry bound still apply. No network at build time. `cli` lens: the diff adds no flags, streams, exit codes or prompts; stdout format is unchanged; stderr stays silent on malformed Kotlin (see F1's fix).
-- [x] Tests: `uv run pytest` 393 passed. `-m slow`: fresh unlocked install, sdist manifest and MCP transport pass; NFR-1 is flaky (F9). Assertion gaps: F4.
-- [x] Readability: the extractor is small and mirrors the Java/Rust extractors. Duplicate test name: F11.
+- [x] Correctness: probed one-line bodies, `${ x }` templates, lambdas `{ x -> }`, `when`, `if/else`, enum and data class bodies, strings containing braces, `'{'`, regex strings, block/KDoc comments, line comments and commented-out callbacks. Line numbers follow the original source. Failures are F1, F12 and F13. No case produced a wrong parent for a real definition.
+- [x] Non-functional: byte-identical rebuild, including the cache round trip. The dd4b994 graph is unchanged under the new code, so non-Kotlin graphs are untouched. No constitution §6 non-negotiable is violated; the §1 principle is violated by F12. NFR-1: F9.
+- [x] Error handling: no tracebacks. The silent partial parse is still not surfaced (F1(b)).
+- [x] Security: no new input path. Regexes are linear (no nested quantifiers), and the 5 MB cap still applies. `cli` lens: no new flags or exit codes, stdout unchanged. Diagnostics: the partial-parse notice is missing from stderr (F1).
+- [x] Tests: `uv run pytest`: 395 passed. `-m slow`: 4 passed twice; the benchmark alone is flaky (F9). Mutations: restoring the ERROR walk, removing the retry, or never setting `partial` each fail at least one new test.
+- [x] Readability: the extractor is small and its comments state why ERROR nodes are skipped. `_error_count` hides the MISSING blind spot (F13).
 
 Open questions for the user/EM:
-- (a) `.spark/constitution.md` §3 still says "the five grammars" and lists five languages. The constitution is user-owned, so I left it unedited.
-- (b) The placeholder `qa.md` holds `✅ pass` rows that the graph's `story_trace` already reads as QA evidence, although its gate says the QA tester has not run. Should those rows stay before `/demo-day`?
+- (a) `.spark/constitution.md` §3 still says "five grammars" and lists five languages. The constitution is user-owned, so it is left unedited.
 
 ## 6. Verdict
 
-Changes requested. The wiring, pin, import resolution and determinism are correct and verified live: AC-1.1, AC-2.1, AC-2.2 and AC-3.1–3.3 pass, and an old-vs-new round trip is byte-identical. But the Must criteria AC-1.2 and AC-1.3 fail on valid Kotlin. A single one-line `class X { companion object { … } }` silently erases every later definition in the file (F1). Two consecutive one-line types make the ERROR recovery fabricate a top-level function and drop the types (F2). That is a wrong link, which the constitution ranks below honest absence. The plan's risk section understates both (F8). F1 needs a design decision (surface partial parses, document the limit, or change the grammar). F2 is an extractor fix with regression tests. F3/F4 should be fixed in the same pass. I fixed F5, F6 and F7 directly (doc counts, a weakened README guard, missing AC-1.1/AC-3.1 assertions) and re-ran the suite green. F9 is a pre-existing flaky benchmark that the EM must settle before release, not a defect of this diff.
+Changes requested. The fix round is real progress, verified live against the pinned grammar:
+- ERROR nodes are no longer walked, which closes the round-1 fabrication (F2).
+- The one-line-body retry restores the round-1 `Login.kt`, `Keys`/`Other` and `A`/`B` probes with correct parents and original line numbers.
+- Imports fan out to every defining file (F3), and the tests now catch the regressions they claim to guard (F4, F11).
+- Determinism holds: a scratch repo with a partial file builds byte-identically fresh, from cache and with `--full`, and the dd4b994 graph is identical under the old and new code.
+
+The retry is not lexically aware, though:
+- **F1 (Major, open).** A file with a one-line `companion object { … }` and an ordinary comment such as `// e.g. items.map { it.id }` loses every definition. The only trace is a `partial` attribute that neither the build output nor `impact` shows. That is the round-1 harm with a common trigger, so AC-1.2 and AC-1.3 stay FAIL.
+- **F12 (Minor).** The same root cause can fabricate an unflagged definition from an unclosed `{` in a comment.
+- **F13 (Minor).** The flag fires falsely on common valid one-liners.
+
+**Fix for F1:**
+- Blank out comments and string literals in the retry copy (same length, offsets kept). This also fixes F12.
+- Then name partial files on stderr and in the MCP build result. The cli lens and this repo's shallow-clone precedent call for that; README text plus a graph attribute alone is not enough.
+- Then apply F13's fix.
+
+F9 and F10 are pre-existing and do not block this gate.
 
 ---
 
@@ -102,9 +124,9 @@ Changes requested. The wiring, pin, import resolution and determinism are correc
 re-review, edit this same checklist in place — never duplicate it as a second gate.*
 
 - [x] No open Blocker findings
-- [ ] No open Major findings (or explicitly waived by the user, with reason recorded here) — F1, F2 open
-- [ ] Every Must AC traces to implementing code; no constitution non-negotiable violated — AC-1.2/AC-1.3 trace to code but FAIL on valid input; no non-negotiable violated
-- [ ] All plan deviations documented and accepted — T3 deviations documented (F5/F7 fixed, F11 open); F8 awaits the EM
-- [x] Test suite runs green — `uv run pytest`: 393 passed (after reviewer fixes); slow NFR-1 flaky pre-existing (F9)
-- [x] Line budget respected: Ist 100 / Soll ~150 (excluding HTML comments)
+- [ ] No open Major findings (or explicitly waived by the user, with reason recorded here) — F1 open
+- [ ] Every Must AC traces to implementing code; no constitution non-negotiable violated — AC-1.2/AC-1.3 trace to code but FAIL on valid input (F1); no §6 non-negotiable violated
+- [x] All plan deviations documented and accepted — plan §5 records the retry, `partial` and import fan-out; the F8 wording follows F12
+- [x] Test suite runs green — `uv run pytest`: 395 passed; `-m slow`: 4 passed (benchmark flaky, pre-existing, F9)
+- [x] Line budget respected: Ist 122 / Soll ~150 (excluding HTML comments)
 - [ ] Status set to `passed` — `changes-requested`

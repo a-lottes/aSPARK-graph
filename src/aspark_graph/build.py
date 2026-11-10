@@ -67,6 +67,9 @@ class BuildReport:
     # when the graph has >=1 plan Task (C5); None means "not checked". Build
     # output only, never graph content (C4).
     git_history: str | None = None
+    # kotlin-support: files the grammar could not read in full (definitions may be
+    # missing). Build output only; the File node also carries `partial: true`.
+    partial: list[str] = field(default_factory=list)
 
     @property
     def shallow_history(self) -> bool:
@@ -167,6 +170,8 @@ def build_graph(repo_root: str | Path, *, full: bool = False) -> tuple[Graph, Bu
 
         file_attrs = {"partial": True} if extraction.partial else {}  # only when true: other graphs stay byte-identical
         graph.add_node(file_id(relpath), NodeType.FILE, language=language, hash=digest, package=extraction.package, **file_attrs)
+        if extraction.partial:
+            report.partial.append(relpath)
         _add_definitions(graph, extraction)
         extractions.append(extraction)
         cache_triples.append((relpath, digest, extraction))

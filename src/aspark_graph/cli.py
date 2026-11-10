@@ -175,6 +175,8 @@ def _cmd_build(args) -> int:
     for path in report.shadowed:
         current = artifacts.CURRENT_NAME_FOR[path.rsplit("/", 1)[-1]]
         print(f"Ignored {path} ({current} takes precedence)", file=sys.stderr)
+    for path in report.partial:
+        print(f"Partially parsed {path} (the grammar could not read the whole file; definitions may be missing)", file=sys.stderr)
     notice = report.history_notice()
     if notice:
         print(notice, file=sys.stderr)

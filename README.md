@@ -274,8 +274,8 @@ Kotlin covers `.kt` and `.kts`: classes, data classes, objects, interfaces, enum
 functions incl. extension and companion members, and best-effort in-repo `import`
 resolution; KMP `expect`/`actual` pairing is out of scope). Known limit: the pinned
 Kotlin grammar cannot parse some valid code (e.g. a body written without spaces,
-`class A{fun g(){}}`); such a file keeps its `File` node, is marked `partial: true`,
-and contributes only the definitions parsed cleanly — never guessed ones.
+`class A{fun g(){}}`); such a file keeps its `File` node, is marked `partial: true` (named on stderr by `build`, listed in the MCP
+`build_graph` result as `partial_files`), and contributes only the definitions parsed cleanly — never guessed ones.
 Files in other languages are recorded as unparsed `File` nodes — the build never
 fails on an unknown language.
 

@@ -294,5 +294,5 @@ def test_history_notice_iff_mcp_key_on_every_fixture(tmp_path, capsys, monkeypat
     assert (SHALLOW_HISTORY_NOTICE in err) == result["shallow_history"]
     assert (NO_GIT_HISTORY_NOTICE in err) == result["no_git_history"]
     assert not (result["shallow_history"] and result["no_git_history"])
-    assert set(result) == _V071_BUILD_KEYS | {"shallow_history", "no_git_history"}
+    assert set(result) == _V071_BUILD_KEYS | {"shallow_history", "no_git_history", "partial_files"}
     assert (a / ".aspark-graph" / "graph.json").read_bytes() == (b / ".aspark-graph" / "graph.json").read_bytes()

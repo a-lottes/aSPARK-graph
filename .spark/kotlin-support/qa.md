@@ -10,3 +10,8 @@
 | **Date** | 2026-11-10 |
 
 Placeholder: the qa-tester agent has not run yet; no results are recorded here.
+
+## 2. Acceptance Criteria Verification
+
+| AC | Steps performed | Expected | Observed | Result |
+|---|---|---|---|---|

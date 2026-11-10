@@ -33,6 +33,7 @@ def build_graph(path: str = ".") -> dict:
         "inferred_edges": report.inferred_edges,
         "unparsed": report.unparsed,
         "ignored_legacy_files": report.shadowed,
+        "partial_files": report.partial,
         "graph_path": str(out_path),
         "shallow_history": report.shallow_history,
         "no_git_history": report.no_git_history,
