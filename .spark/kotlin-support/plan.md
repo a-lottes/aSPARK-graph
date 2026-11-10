@@ -19,7 +19,7 @@
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
 - **Summary:** Kotlin is a sixth registry entry: pure single-file `code_kotlin.py` (five type forms fold into `Class`, companion members nest under the owner, extension fns are parentless `Recv.name`) plus a package-declaration index in `build.py` for imports; adapters untouched. Written retroactively against commit 215a915.
-- **Open:** `1 task not done` — see §3 Task Breakdown for which (T6: test/doc gaps found when tracing 215a915 against the spec, plus the verification sweep)
+- **Open:** `none` — all tasks T1–T6 `done` (§3)
 - **Binding ruling:** §3 Task Breakdown for current task status; a plan revision after review/QA findings updates §1/§3 in place, never a new section
 - **On conflict:** the numbered body below wins for everything except `Status`; log the mismatch as a finding at the next `/peer-review` and proceed — don't stop on it.
 
@@ -127,8 +127,8 @@ QA-equivalent runs in `/peer-review`.
 | **R1 — Grammar node shapes** (`object_declaration`, `companion_object`, receiver detection by a `.` token before `function_value_parameters`) differ from Java. | Mis-parented or missing definitions. | Extractor written against real parsed trees; unit tests pin each shape; grammar pinned `==` so shapes cannot drift. |
 | **R2 — One-line class body → `ERROR` subtree (A7).** | Members missed or partial in compact files. | Accepted as risk by the spec; `ERROR` is walked as a body for best-effort recovery; T6 documents it in README (AC-3.5). |
 | **R3 — Duplicate `package.Name` across Gradle modules.** | First-writer-wins may link the wrong module's file (a wrong, not absent, edge). | Spec A5 accepts best-effort; deterministic because the walk is sorted. Revisit only with a module-aware feature (§6). |
-| **R4 — AC-3.4 is not satisfiable as written.** `language_for(".rb")` returns `None` and `build.py` skips such files entirely: no `File` node, so no `unparsed: true` either. `unparsed` is reached only for a known language with no registered extractor (the Java-cut test) or the 5 MB cap. The same premise error is in spec §1 (pre-change `.kt` files had no node at all) and in the `base.py` comment. | A reviewer cannot check AC-3.4 with a yes or no against the behaviour the spec describes. | Question for the Product Owner: reword AC-3.4 to "a file outside the registry gets no node, and a registered language without an extractor stays `unparsed`". Until then T6 checks the existing behaviour and does not change the build. |
-| **R5 — Retroactive plan.** Tasks T1–T5 describe a commit that was written before the plan, so the plan did not shape the code. | Spec gaps went unnoticed (AC-1.8, AC-1.9, AC-3.5 limit note). | Traced every AC against 215a915; gaps are carried as T6 `todo` rather than marked done. |
+| **R4 — Unlisted vs. unregistered languages (resolved).** `language_for(".rb")` returns `None` and `build.py` skips such files (no node); `unparsed` is reached only for a known language with no registered extractor or the 5 MB cap. | Spec §1 and the `base.py` comment had described pre-change `.kt` files as unparsed. | Resolved: AC-3.4 as worded matches this behaviour and is tested (`.rb` skip + Kotlin-cut `unparsed`); spec §1 and `base.py` corrected (review F6/F9). |
+| **R5 — Retroactive plan.** Tasks T1–T5 describe a commit that was written before the plan, so the plan did not shape the code. | Spec gaps went unnoticed (AC-1.8, AC-1.9, AC-3.5 limit note). | Traced every AC against 215a915; gaps were carried as T6 and are now `done`. |
 | **R6 — Inherited spec assumptions A3–A6, A8** (parentless extension fns, no local fns, no Gradle, silent unresolved imports, uniform `.kts`). | Lower fidelity than a naive user expects. | Explicit spec decisions with §6 entries; inherited without widening scope. |
 
 ---
@@ -141,7 +141,7 @@ QA-equivalent runs in `/peer-review`.
 - [x] Architecture decision includes rejected alternatives (a decision without alternatives is a guess)
 - [x] Architecture respects the constitution's technical constraints (`==` pin, thin adapters, no network, determinism; `constitution.md §3` stack list still says five grammars and is recorded in §1 Consequences)
 - [x] Every task maps to a user story — no orphan tasks, no story without tasks
-- [x] Every Must AC and every applicable NFR is covered by at least one task (AC-3.4 is covered by T6, with the wording issue in R4)
+- [x] Every Must AC and every applicable NFR is covered by at least one task (AC-3.4 is covered by T6; R4 resolved)
 - [x] Every task has a checkable definition of done
 - [x] Task order respects dependencies
 - [x] Test strategy covers every Must story

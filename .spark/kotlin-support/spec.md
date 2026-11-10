@@ -30,7 +30,7 @@
 
 ## 1. Problem & Goal
 
-- **Problem:** Code extraction covers Python, TS/JS, Java, Go and Rust (`src/aspark_graph/extractors/`, `constitution.md §9` stack). Every `.kt`/`.kts` file is recorded as an unparsed `File` node (the fallback proven by the unsupported-language test), so `impact` and `story_trace` find no `Class`/`Function` structure and no `imports` edges in Android and Kotlin/JVM repos. Only `declared` plan `files:` links work there.
+- **Problem:** Code extraction covers Python, TS/JS, Java, Go and Rust (`src/aspark_graph/extractors/`, `constitution.md §9` stack). `.kt`/`.kts` are not in the language table, so such files get no node at all (unlisted extensions are skipped), and `impact` and `story_trace` find no `Class`/`Function` structure and no `imports` edges in Android and Kotlin/JVM repos. Only `declared` plan `files:` links work there.
 - **Goal:** Add Kotlin through the existing extractor pattern (bytes in, `FileExtraction` out; per-language module plus registry entry), with best-effort in-repo `imports` edges as for Go and Rust.
 - **Success signal:** (1) a built repo with `.kt`/`.kts` files has `Class`/`Function` nodes for them and no `unparsed: true` Kotlin `File` nodes; (2) `tests/test_extractor_kotlin.py` and the multi-language build test pass; (3) double build of a Kotlin repo is byte-identical; (4) `uv run pytest` stays green with no regression to the five existing languages.
 - **Why now:** Ticket #34. Kotlin is the default language of Android and a common JVM choice; those repos currently get none of the tool's differentiating value. The cost is bounded by the proven per-language pattern.
