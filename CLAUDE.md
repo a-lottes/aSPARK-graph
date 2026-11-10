@@ -5,7 +5,7 @@ Guidance for AI agents working in this repo. Part of the aSPARK product family.
 ## What this is
 
 A lean, local **code-and-artifact knowledge graph** served over MCP + a CLI. It
-links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust) with its `.spark/`
+links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust, Kotlin) with its `.spark/`
 delivery artifacts, so agents can ask `story_trace` ("which code implements this
 story, and did its ACs pass QA?") and `impact` ("what's the blast radius of
 changing these files?"). Deterministic and offline; the **persisted graph**
@@ -78,7 +78,7 @@ each adapter. Never compute an answer in an adapter.
 
 - **Determinism (AC-1.2).** The graph must rebuild byte-for-byte on an unchanged
   repo. Persistence is canonical (sorted nodes/edges, `sort_keys`). Parse-
-  affecting deps (the five tree-sitter grammars + core) are pinned `==`;
+  affecting deps (the six tree-sitter grammars + core) are pinned `==`;
   `uv.lock` covers the rest. There is a byte-identical double-build test — keep it.
 - **Fail loudly on template drift (AC-1.3).** `artifacts.py` is pinned to a
   supported template shape and raises `TemplateDriftError` naming the file + the
