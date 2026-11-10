@@ -47,20 +47,24 @@ def test_build_resolves_java_import(tmp_path):  # AC-4.1 Java
     ) in edges
 
 
-def test_all_six_languages_in_one_build(tmp_path):  # AC-4.1 / go-rust-support AC-5.1: none may be missing
+def test_all_seven_languages_in_one_build(tmp_path):  # AC-4.1 / go-rust-support AC-5.1: none may be missing
     (tmp_path / "a.py").write_text("def f():\n    return 1\n")
     (tmp_path / "b.ts").write_text("export function g() { return 1; }\n")
     (tmp_path / "C.java").write_text("public class C { public void m() {} }\n")
     (tmp_path / "d.go").write_text("package main\n\nfunc D() int { return 1 }\n")
     (tmp_path / "e.rs").write_text("pub fn e() -> i32 { 1 }\n")
+    (tmp_path / "f.kt").write_text("class F {\n    fun f() {}\n}\n")
+    (tmp_path / "g.js").write_text("export function jj() { return 1; }\n")
     graph, _ = build_graph(tmp_path)
     langs = {n.get("language") for n in graph.nodes() if n["type"] == "File"}
-    assert {"python", "typescript", "java", "go", "rust"} <= langs
+    assert {"python", "typescript", "javascript", "java", "go", "rust", "kotlin"} <= langs
     assert graph.has_node(definition_id("a.py", "f"))
     assert graph.has_node(definition_id("b.ts", "g"))
     assert graph.has_node(definition_id("C.java", "C"))
     assert graph.has_node(definition_id("d.go", "D"))
     assert graph.has_node(definition_id("e.rs", "e"))
+    assert graph.has_node(definition_id("f.kt", "F.f"))
+    assert graph.has_node(definition_id("g.js", "jj"))
     unparsed = {n["id"] for n in graph.nodes() if n["type"] == "File" and n.get("unparsed")}
     assert unparsed == set()
 
@@ -80,3 +84,11 @@ def test_ac_4_2_unsupported_language_becomes_unparsed_file_node(tmp_path, monkey
     assert "Cut.java" in report.unparsed
     # Build still succeeded and the supported language is fully parsed.
     assert graph.has_node(definition_id("a.py", "ok"))
+
+
+def test_unknown_extension_is_handled_as_before(tmp_path):  # kotlin-support AC-3.2 (C9)
+    (tmp_path / "a.py").write_text("def f():\n    return 1\n")
+    (tmp_path / "x.rb").write_text("def x; end\n")
+    graph, _ = build_graph(tmp_path)
+    assert not graph.has_node(file_id("x.rb"))
+    assert graph.has_node(file_id("a.py"))
