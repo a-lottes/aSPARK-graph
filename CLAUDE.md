@@ -5,7 +5,7 @@ Guidance for AI agents working in this repo. Part of the aSPARK product family.
 ## What this is
 
 A lean, local **code-and-artifact knowledge graph** served over MCP + a CLI. It
-links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust) with its `.spark/`
+links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust, Kotlin) with its `.spark/`
 delivery artifacts, so agents can ask `story_trace` ("which code implements this
 story, and did its ACs pass QA?") and `impact` ("what's the blast radius of
 changing these files?"). Deterministic and offline; the **persisted graph**
@@ -45,6 +45,7 @@ on stderr and in the MCP `build_graph` booleans `shallow_history`/`no_git_histor
 grafted boundary commits contribute no inferred links, so truncated history only
 loses links; non-shallow graph.json byte-identical to v0.7.1; known limits: git
 < 2.15, monorepo subprojects, `--filter=tree:0` (BACKLOG G11)).
+`kotlin-support/` (unreleased, issue #29 — Kotlin extractor, six languages; trail under the OLD artifact names; grammar 1.1.0 mis-parses single-line `class A { fun m() {} }`).
 v0.7.3 is a direct hotfix without a `.spark/` trail (user's call): caps `pydantic<2.14`,
 because pydantic 2.14 broke `serve` in every fresh install of 0.7.1/0.7.2 (found by the
 v0.7.2 post-release smoke check; see `.spark/shallow-clone-warning/release.md` §3).
@@ -78,7 +79,7 @@ each adapter. Never compute an answer in an adapter.
 
 - **Determinism (AC-1.2).** The graph must rebuild byte-for-byte on an unchanged
   repo. Persistence is canonical (sorted nodes/edges, `sort_keys`). Parse-
-  affecting deps (the five tree-sitter grammars + core) are pinned `==`;
+  affecting deps (the six tree-sitter grammars + core) are pinned `==`;
   `uv.lock` covers the rest. There is a byte-identical double-build test — keep it.
 - **Fail loudly on template drift (AC-1.3).** `artifacts.py` is pinned to a
   supported template shape and raises `TemplateDriftError` naming the file + the
