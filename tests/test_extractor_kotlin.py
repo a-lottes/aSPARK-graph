@@ -105,7 +105,7 @@ def test_build_resolves_kotlin_imports(tmp_path):
     src = file_id("app/Main.kt")
     assert (src, file_id("util/Fns.kt"), "imports") in edges
     # nested (Helper.Inner) resolves to no edge; only the plain function import does.
-    assert (src, file_id("util/Fns.kt"), "imports") in edges
+    assert (src, file_id("util/Helper.kt"), "imports") not in edges
     assert len([e for e in edges if e[0] == src and e[2] == "imports"]) == 1
 
 
@@ -255,3 +255,15 @@ def test_kotlin_edges_are_extracted_and_endpoints_exist(tmp_path):
     for e in kt:
         assert e["source"] in ids and e["target"] in ids
         assert e["confidence"] == "extracted"
+
+
+def test_missing_name_from_error_recovery_yields_no_definition():  # review F1
+    # Invalid UTF-8 after `class` makes the grammar insert a MISSING identifier.
+    r = code_kotlin.extract("x.kt", b"package p\n\nclass \xff\xfe {\n}\n")
+    assert all(d.qualname for d in r.definitions)
+    assert r.package == "p"
+
+
+def test_wildcard_with_space_before_star_is_still_wildcard():  # review F3
+    r = code_kotlin.extract("x.kt", b"import a.b. *\nimport a.c.D // not .*\n")
+    assert [i.module for i in r.imports] == ["a.b.*", "a.c.D"]

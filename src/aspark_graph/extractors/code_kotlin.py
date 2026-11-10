@@ -40,13 +40,17 @@ def _text(node: Node) -> str:
 
 def _name(node: Node) -> str | None:
     n = node.child_by_field_name("name")
-    return _text(n) if n is not None else None
+    # A MISSING (zero-width, error-recovery) identifier is no name: skip the node
+    # rather than emit a definition with an empty qualname.
+    if n is None or n.is_missing or not n.text:
+        return None
+    return _text(n)
 
 
 def _exported(node: Node) -> bool:
     for c in node.named_children:
         if c.type == "modifiers":
-            return b"private" not in c.text.split()
+            return _PRIVATE not in c.text.split()
     return True
 
 
@@ -120,6 +124,6 @@ def _add_import(node: Node, result: FileExtraction) -> None:
     if q is None:
         return
     module = _text(q)
-    if any(not c.is_named and c.type == "*" for c in node.children) or b".*" in node.text.replace(b" ", b""):
+    if any(not c.is_named and c.type == "*" for c in node.children):
         module += ".*"
     result.imports.append(Import(module=module, relative=False))

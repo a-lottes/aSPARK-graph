@@ -275,7 +275,8 @@ companion object) and `Function` (including extension functions) nodes; `import`
 directives resolve best-effort to in-repo files by `package` header.
 Known Kotlin limits: wildcard imports (`import a.b.*`), nested-class imports and names
 declared in more than one file resolve to no edge; the grammar can misparse some one-line
-forms such as `class A { fun m() {} }` (multi-line source is fine); Multiplatform
+forms such as `class A { companion object { fun c() {} } }` — the class is dropped and
+`c` is recorded as a top-level function (multi-line source is fine); Multiplatform
 `expect`/`actual` pairing is not modelled.
 Files with an unrecognised extension get no node — the build never fails on an unknown
 language. A known language whose extractor is unavailable is recorded as an unparsed `File`.
