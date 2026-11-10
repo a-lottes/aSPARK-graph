@@ -41,7 +41,8 @@ class FileExtraction:
 
 
 # extension -> language name; the build uses this to pick an extractor and to
-# label File nodes. Unlisted extensions are recorded as unparsed (AC-4.2).
+# label File nodes. Unlisted extensions are skipped (no node); a listed language
+# with no registered extractor is recorded as unparsed (AC-4.2).
 EXTENSION_LANGUAGE = {
     ".py": "python",
     ".ts": "typescript",

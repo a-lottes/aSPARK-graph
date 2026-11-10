@@ -118,8 +118,11 @@ def test_build_resolves_kotlin_imports(tmp_path):
     s = file_id("src/app/Star.kt")
     assert (s, file_id("src/util/Helper.kt"), "imports") in edges
     assert (s, file_id("src/util/Extras.kt"), "imports") in edges
-    # stdlib / unresolvable imports add no edge
-    assert not [e for e in edges if e[0] == w and e[1].endswith("List")]
+    # stdlib / unresolvable imports add no edge: Widget.kt links to exactly the two repo files
+    assert {e[1] for e in edges if e[0] == w and e[2] == "imports"} == {
+        file_id("src/util/Helper.kt"),
+        file_id("src/util/Extras.kt"),
+    }
 
 
 def test_kotlin_unresolved_import_is_silent(tmp_path):
@@ -149,6 +152,7 @@ def test_kotlin_package_only_and_comment_only_files(tmp_path):
         node = graph.get_node(file_id(name))
         assert node is not None and node["language"] == "kotlin"
         assert not node.get("unparsed")
+        assert not [n for n in graph.nodes() if n["id"].startswith(f"def:{name}::")]
 
 
 def test_kotlin_unregistered_extractor_is_unparsed(tmp_path, monkeypatch):
@@ -157,12 +161,28 @@ def test_kotlin_unregistered_extractor_is_unparsed(tmp_path, monkeypatch):
     monkeypatch.setitem(extractors._REGISTRY, "kotlin", None)
     monkeypatch.setattr(extractors, "get_extractor", lambda lang: extractors._REGISTRY.get(lang))
     (tmp_path / "K.kt").write_text("class K {\n}\n")
+    (tmp_path / "r.rb").write_text("class R; end\n")
     graph, report = build_graph(tmp_path)
     assert graph.get_node(file_id("K.kt")).get("unparsed") is True
     assert "K.kt" in report.unparsed
+    # AC-3.4: an extension outside the language table is skipped, as before.
+    assert graph.get_node(file_id("r.rb")) is None
 
 
 def test_kotlin_malformed_source_builds_without_error(tmp_path):
     (tmp_path / "M.kt").write_text("class {{{ fun ( ) = \n")
     graph, _ = build_graph(tmp_path)
     assert graph.get_node(file_id("M.kt")) is not None
+
+
+def test_build_resolves_extension_function_import_by_bare_name(tmp_path):  # review F1
+    (tmp_path / "Ext.kt").write_text("package lib\n\nfun String.buffer() {}\n")
+    (tmp_path / "Use.kt").write_text("package app\n\nimport lib.buffer\n\nclass Use {\n}\n")
+    graph, _ = build_graph(tmp_path)
+    edges = {(e["source"], e["target"], e["type"]) for e in graph.edges()}
+    assert (file_id("Use.kt"), file_id("Ext.kt"), "imports") in edges
+
+
+def test_kotlin_qualified_receiver_uses_last_segment():  # review F3
+    r = code_kotlin.extract("Q.kt", b"fun kotlin.String.q() {}\n")
+    assert [d.qualname for d in r.definitions] == ["String.q"]

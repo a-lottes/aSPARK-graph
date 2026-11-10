@@ -125,8 +125,9 @@ def _receiver_type(node: Node) -> str | None:
             inner = c
             while inner.type == "nullable_type" and inner.named_children:
                 inner = inner.named_children[0]
-            ident = next((x for x in inner.named_children if x.type == "identifier"), None)
-            return _text(ident) if ident is not None else _text(inner)
+            idents = [x for x in inner.named_children if x.type == "identifier"]
+            # `fun kotlin.String.q()`: the receiver type is the last segment.
+            return _text(idents[-1]) if idents else _text(inner)
         if c.type == "function_value_parameters":
             break
     return None

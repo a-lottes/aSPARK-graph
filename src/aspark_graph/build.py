@@ -287,6 +287,10 @@ def _kotlin_indexes(
         for d in e.definitions:
             if d.parent is None:
                 index.setdefault(f"{prefix}{d.qualname}", e.relpath)
+                if d.kind == "Function" and "." in d.qualname:
+                    # Extension function `Recv.name`: Kotlin imports it by its
+                    # bare name (`import pkg.name`), not through the receiver.
+                    index.setdefault(f"{prefix}{d.qualname.rsplit('.', 1)[1]}", e.relpath)
             elif d.kind == "Class":
                 index.setdefault(f"{prefix}{d.qualname}", e.relpath)
     return index, packages
@@ -299,7 +303,9 @@ def _resolve_kotlin_import(
         return list(packages.get(module[:-2], []))
     parts = module.split(".")
     # `a.b.C.member` / `a.b.C.Companion.make`: strip trailing segments until a
-    # declaration matches (never beyond the package-qualified name).
+    # declaration matches. Stripping can go below the package prefix, so a
+    # default-package declaration named like a leading segment (`class com`)
+    # can match (spec A5/AC-2.3 rule, best-effort).
     while parts:
         hit = index.get(".".join(parts))
         if hit:
