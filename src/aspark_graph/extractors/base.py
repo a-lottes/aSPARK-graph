@@ -53,6 +53,8 @@ EXTENSION_LANGUAGE = {
     ".java": "java",
     ".go": "go",
     ".rs": "rust",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
 }
 
 

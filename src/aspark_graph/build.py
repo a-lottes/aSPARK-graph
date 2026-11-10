@@ -239,6 +239,7 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
     java_index = _java_type_index(extractions)
     go_index = _go_package_index(extractions)
     rust_index = _rust_module_index(extractions)
+    kt_index, kt_packages = _kotlin_indexes(extractions)
     rel_index = {e.relpath for e in extractions}
     for e in extractions:
         src = file_id(e.relpath)
@@ -247,6 +248,11 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
                 # A Go import addresses a package (a directory), not a single
                 # file, so an unambiguous match can fan out to several files.
                 for target_rel in _resolve_go_import(imp, e.relpath, go_index):
+                    if target_rel in rel_index and target_rel != e.relpath:
+                        graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
+                continue
+            if e.language == "kotlin":
+                for target_rel in _resolve_kotlin_import(imp.module, kt_index, kt_packages):
                     if target_rel in rel_index and target_rel != e.relpath:
                         graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
                 continue
@@ -262,6 +268,44 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
             # Only emit an edge when we resolve to a file that is in the graph.
             if target_rel and target_rel in rel_index and target_rel != e.relpath:
                 graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
+
+
+def _kotlin_indexes(
+    extractions: list[FileExtraction],
+) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """Kotlin: ``package.Qualname`` -> relpath (first writer wins), and
+    ``package`` -> its files. Kotlin imports name a declaration, not a file, so
+    the file is found through the package declared inside it (best-effort).
+    Top-level functions are indexed too (``import a.b.helper``)."""
+    index: dict[str, str] = {}
+    packages: dict[str, list[str]] = {}
+    for e in extractions:
+        if e.language != "kotlin":
+            continue
+        prefix = f"{e.package}." if e.package else ""
+        packages.setdefault(e.package or "", []).append(e.relpath)
+        for d in e.definitions:
+            if d.parent is None:
+                index.setdefault(f"{prefix}{d.qualname}", e.relpath)
+            elif d.kind == "Class":
+                index.setdefault(f"{prefix}{d.qualname}", e.relpath)
+    return index, packages
+
+
+def _resolve_kotlin_import(
+    module: str, index: dict[str, str], packages: dict[str, list[str]]
+) -> list[str]:
+    if module.endswith(".*"):
+        return list(packages.get(module[:-2], []))
+    parts = module.split(".")
+    # `a.b.C.member` / `a.b.C.Companion.make`: strip trailing segments until a
+    # declaration matches (never beyond the package-qualified name).
+    while parts:
+        hit = index.get(".".join(parts))
+        if hit:
+            return [hit]
+        parts = parts[:-1]
+    return []
 
 
 def _python_module_index(extractions: list[FileExtraction]) -> dict[str, str]:
