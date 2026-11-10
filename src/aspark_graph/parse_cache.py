@@ -41,6 +41,7 @@ def _version_tag() -> str:
         f":tree-sitter-python={v('tree-sitter-python')}"
         f":tree-sitter-typescript={v('tree-sitter-typescript')}"
         f":tree-sitter-java={v('tree-sitter-java')}"
+        f":tree-sitter-kotlin={v('tree-sitter-kotlin')}"
     )
 
 

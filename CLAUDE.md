@@ -5,7 +5,7 @@ Guidance for AI agents working in this repo. Part of the aSPARK product family.
 ## What this is
 
 A lean, local **code-and-artifact knowledge graph** served over MCP + a CLI. It
-links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust) with its `.spark/`
+links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust, Kotlin) with its `.spark/`
 delivery artifacts, so agents can ask `story_trace` ("which code implements this
 story, and did its ACs pass QA?") and `impact` ("what's the blast radius of
 changing these files?"). Deterministic and offline; the **persisted graph**

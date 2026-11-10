@@ -239,6 +239,7 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
     java_index = _java_type_index(extractions)
     go_index = _go_package_index(extractions)
     rust_index = _rust_module_index(extractions)
+    kotlin_index = _kotlin_symbol_index(extractions)
     rel_index = {e.relpath for e in extractions}
     for e in extractions:
         src = file_id(e.relpath)
@@ -259,6 +260,8 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
                 target_rel = java_index.get(imp.module)
             elif e.language == "rust":
                 target_rel = _resolve_rust_import(imp, e.relpath, rust_index)
+            elif e.language == "kotlin":
+                target_rel = _resolve_kotlin_import(imp.module, kotlin_index)
             # Only emit an edge when we resolve to a file that is in the graph.
             if target_rel and target_rel in rel_index and target_rel != e.relpath:
                 graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
@@ -299,6 +302,37 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
             if d.kind == "Class" and d.parent is None:
                 index.setdefault(f"{prefix}{d.qualname}", e.relpath)
     return index
+
+
+def _kotlin_symbol_index(extractions: list[FileExtraction]) -> dict[str, str]:
+    """Map fully-qualified top-level Kotlin names (``package.Name``) -> relpath.
+
+    Covers top-level classes/objects *and* top-level functions (Kotlin imports
+    both). First writer wins (files are visited in sorted order)."""
+    index: dict[str, str] = {}
+    for e in extractions:
+        if e.language != "kotlin":
+            continue
+        prefix = f"{e.package}." if e.package else ""
+        for d in e.definitions:
+            if d.parent is None:
+                index.setdefault(f"{prefix}{d.qualname}", e.relpath)
+    return index
+
+
+def _resolve_kotlin_import(module: str, index: dict[str, str]) -> str | None:
+    """Best-effort: exact name, else walk up (``a.Outer.Inner`` -> ``a.Outer``).
+
+    A wildcard import names a package, not a file: no edge. Stdlib/third-party
+    names match nothing and emit no edge."""
+    if module.endswith(".*"):
+        return None
+    while True:
+        if module in index:
+            return index[module]
+        if "." not in module:
+            return None
+        module = module.rsplit(".", 1)[0]
 
 
 def _go_package_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
