@@ -269,9 +269,18 @@ ones. The exit code and the stdout format are unchanged, and on a full clone
 
 ## Supported languages
 
-Code extraction covers **Python, TypeScript/JavaScript, Java, Go and Rust** (tree-sitter).
-Files in other languages are recorded as unparsed `File` nodes — the build never
-fails on an unknown language.
+Code extraction covers **Python, TypeScript/JavaScript, Java, Go, Rust and Kotlin** (tree-sitter;
+`.kt` and `.kts`). Kotlin classes, objects, interfaces and enums become `Class` nodes,
+functions (extension and companion members included) become `Function` nodes, and
+`import` directives become best-effort in-repo `imports` edges (star imports are not
+resolved). Multiplatform `expect`/`actual` pairing is not modelled.
+Known limits: a class body opened and closed on one line (`class A { fun f() {} }`)
+may lose or misplace members, and several in a row can hide the definitions after them; an import alias is ignored (the import resolves by its
+original path); extension functions imported by name are not resolved; an import that
+matches more than one file gives no edge; Kotlin and Java files do not resolve imports
+to each other; imports of top-level `val`, `const` or `typealias` do not resolve.
+Files with other extensions are skipped (no node) — the build never fails on an
+unknown language.
 
 ## Artifacts read
 
@@ -292,8 +301,8 @@ first — `❌` fail, `⚠` unverified, `✅` pass — and by its words only whe
 ## Design guarantees (why you can trust the output)
 
 - **Deterministic.** Byte-identical rebuild on an unchanged repo; parse-affecting
-  dependencies are pinned exactly; a double-build test enforces it. The five
-  tree-sitter grammars (Python, TypeScript, Java, Go, Rust) and tree-sitter core
+  dependencies are pinned exactly; a double-build test enforces it. The
+  tree-sitter grammars (Python, TypeScript, Java, Go, Rust, Kotlin) and tree-sitter core
   are pinned with `==`, and the committed `uv.lock` is part of the determinism
   contract for the rest — a grammar version can change the node types it
   extracts, so an unpinned grammar would silently break byte-identity.
@@ -312,10 +321,10 @@ first — `❌` fail, `⚠` unverified, `✅` pass — and by its words only whe
 
 ## Out of scope
 
-Languages beyond the five currently supported, an LLM/natural-language layer, precise
+Languages beyond those currently supported, an LLM/natural-language layer, precise
 call-graph resolution, a visualization UI, exports (Neo4j/GraphML/Obsidian), HTTP/team
 mode, and authenticated or remote MCP transport are out of scope. The current language
-support is Python, TypeScript/JavaScript, Java, Go, and Rust.
+support is Python, TypeScript/JavaScript, Java, Go, Rust, and Kotlin.
 
 ## Development
 

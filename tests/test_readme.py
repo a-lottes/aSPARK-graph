@@ -71,7 +71,7 @@ def test_current_names_ac_6_1_no_six_language_count():
 
 def test_current_names_ac_6_1_five_languages_stated():
     normalized = " ".join(README.split())
-    assert "Python, TypeScript/JavaScript, Java, Go and Rust" in normalized
+    assert "Python, TypeScript/JavaScript, Java, Go, Rust and Kotlin" in normalized
 
 
 def test_current_names_ac_6_3_artifact_names_listed():
@@ -115,3 +115,9 @@ def test_shallow_clone_warning_t15_no_blanket_graph_json_claim():
     flat = " ".join(README.split())
     assert "and `graph.json` stay the same" not in flat
     assert "never extra ones" in flat
+
+
+def test_kotlin_known_limits_stated():
+    normalized = " ".join(README.split())
+    assert "opened and closed on one line" in normalized
+    assert "import alias is ignored" in normalized

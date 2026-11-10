@@ -237,6 +237,7 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
     """Best-effort File -> File ``imports`` edges (static; may be incomplete)."""
     py_index = _python_module_index(extractions)
     java_index = _java_type_index(extractions)
+    kotlin_index = _kotlin_symbol_index(extractions)
     go_index = _go_package_index(extractions)
     rust_index = _rust_module_index(extractions)
     rel_index = {e.relpath for e in extractions}
@@ -257,6 +258,8 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
                 target_rel = _resolve_ts_import(imp, e.relpath, rel_index)
             elif e.language == "java":
                 target_rel = java_index.get(imp.module)
+            elif e.language == "kotlin":
+                target_rel = _resolve_kotlin_import(imp.module, kotlin_index)
             elif e.language == "rust":
                 target_rel = _resolve_rust_import(imp, e.relpath, rust_index)
             # Only emit an edge when we resolve to a file that is in the graph.
@@ -299,6 +302,36 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
             if d.kind == "Class" and d.parent is None:
                 index.setdefault(f"{prefix}{d.qualname}", e.relpath)
     return index
+
+
+def _kotlin_symbol_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
+    """Map ``package.Name`` -> sorted distinct relpaths declaring it (top level).
+
+    More than one file declaring the same name in one package (e.g. Android
+    build variants) makes the import ambiguous; the resolver then emits no
+    edge rather than guessing. Star imports never resolve.
+    """
+    index: dict[str, set[str]] = {}
+    for e in extractions:
+        if e.language != "kotlin":
+            continue
+        prefix = f"{e.package}." if e.package else ""
+        for d in e.definitions:
+            if d.parent is None and "." not in d.qualname:
+                index.setdefault(f"{prefix}{d.qualname}", set()).add(e.relpath)
+    return {k: sorted(v) for k, v in index.items()}
+
+
+def _resolve_kotlin_import(module: str, index: dict[str, list[str]]) -> str | None:
+    if module.endswith(".*"):
+        return None
+    candidates = index.get(module)
+    if candidates is None:
+        # `import pkg.Outer.Inner` / `import pkg.Obj.member`: fall back to the owner.
+        candidates = index.get(module.rpartition(".")[0])
+    if candidates is not None and len(candidates) == 1:
+        return candidates[0]
+    return None
 
 
 def _go_package_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
