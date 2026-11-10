@@ -184,3 +184,47 @@ def test_retry_never_rewrites_identifiers_or_literals():  # review F14/F15
 
 def test_missing_nodes_flag_the_file_partial():  # review F16
     assert code_kotlin.extract("A.kt", b"val x = (1\nfun g() {}\n").partial is True
+
+
+def test_retry_keeps_backtick_names_with_braces_and_slashes():  # review r4 test gap
+    src = (
+        "class Fake { fun f() {} }\n"
+        "class T {\n    fun `given { x } then`() {}\n    fun `GET //api /* x */`() {}\n}\n"
+    ).encode()
+    r = code_kotlin.extract("A.kt", src)
+    assert r.partial is False
+    assert {(d.qualname, d.parent, d.line) for d in r.definitions} == {
+        ("Fake", None, 1), ("Fake.f", "Fake", 1), ("T", None, 2),
+        ("T.`given { x } then`", "T", 3), ("T.`GET //api /* x */`", "T", 4),
+    }
+
+
+def test_root_error_is_never_walked():  # review F18: the root ERROR mis-parented `o`
+    src = (
+        b"object O1 { fun o() = 1 }\n"
+        b"/* outer /* inner */ class Ghost { fun g() {} } */\n"
+        b"/* outer /* inner */ class Ghost { fun g() {} } */\n"
+        b"class S2 {\n    fun `GET //api`() {}\n}\n"
+        b"class X3 { companion object { const val T = 1 } }\n"
+        b'val u = "http://x.com/{id}"\n'
+        b"class L4 {\n    fun login() {}\n}\n"
+        b"/** KDoc { @see Foo } */\n"
+    )
+    r = code_kotlin.extract("A.kt", src)
+    expected = {
+        ("O1", None, 1), ("O1.o", "O1", 1), ("S2", None, 4), ("S2.`GET //api`", "S2", 5),
+        ("X3", None, 7), ("X3.Companion", "X3", 7), ("L4", None, 9), ("L4.login", "L4", 10),
+    }
+    got = {(d.qualname, d.parent, d.line) for d in r.definitions}
+    # complete, or flagged partial with only true facts — never a mis-parented `o`
+    assert got == expected or (r.partial and got <= expected)
+
+
+def test_comment_markers_inside_templates_do_not_swallow_code():  # review F17
+    src = (
+        b'val g = "${dir("/*")}"\\nclass X { companion object { const val T = 1 } }\\n'
+        b'class Keep { fun keep() {} }\\nval h = "${dir("*/")}"\\n'
+    ).decode("unicode_escape").encode()
+    r = code_kotlin.extract("A.kt", src)
+    names = {d.qualname for d in r.definitions}
+    assert {"X", "Keep", "Keep.keep"} <= names or r.partial

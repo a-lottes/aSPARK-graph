@@ -6,9 +6,9 @@
 |---|---|
 | **Phase** | Review |
 | **Owner** | Reviewer (`/peer-review`) |
-| **Input** | The diff of `/increment` (`git diff dd4b994..HEAD`; fix round 8dc45c6 = `git diff 62f3a49..HEAD`), `.spark/kotlin-support/plan.md` |
+| **Input** | The diff of `/increment` (`git diff dd4b994..HEAD`; fix round ff6a910 = `git diff 8dc45c6..HEAD`), `.spark/kotlin-support/plan.md` |
 | **Status** | `changes-requested` |
-| **Round** | 3 |
+| **Round** | 4 |
 | **Date** | 2026-11-10 |
 
 <!-- Handoff: read this block first, the numbered sections below by exception. Whoever
@@ -25,31 +25,37 @@
 
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
-- **Verdict:** Fixes applied by `/increment` for F14-F16 (retry skips string/char/backtick literals verbatim instead of blanking them; comments still blanked); awaiting re-review.
-- **Open:** `2 open` — Blockers: none; Majors: none (F9, F10 pre-existing; F14, F15, F16 fixed, awaiting re-review)
+- **Verdict:** Changes requested (r4). F14, F15 and F16 are confirmed fixed. The reviewer fixed F18 (Major), F19 and F20 in the working tree; these fixes are uncommitted. F17 (Minor) is still open, and it keeps AC-1.2 and AC-1.3 at FAIL.
+- **Open:** `3 open` — Blockers: none; Majors: none (F17 Minor; F9 Minor and F10 Nit are pre-existing and non-blocking)
 - **Binding ruling:** §6 Verdict and the gate checklist below are the only binding location. There is no other round to point to.
 - **On conflict:** the numbered body below wins for everything except `Status`. Log the mismatch as a finding at the next `/peer-review` and proceed; don't stop on it.
 
 ## 1. Scope
 
-- **Reviewed:** the fix round `git diff 62f3a49..HEAD` in full (`code_kotlin.py`, `build.py`, `cli.py`, `server.py`, `parse_cache.py`, both test files, `README.md`, plan §5). Context read: `cli.py:164-187`, `server.py:21-39`, `build.py:150-176`. The thin-adapter rule holds: `report.partial` is computed in `build.py:173-174`, and each adapter only renders it.
-- **Mode:** live run against the pinned `tree-sitter-kotlin==1.1.0` with `tree-sitter==0.26.0` (printed by the probe). Checks: the full and slow suites; about 40 hand probes; a seeded differential fuzz of 6,000 files that checks every definition (name, kind, parent, line) against the known set; 5 mutations; CLI and MCP builds of a git-marked six-language scratch repo; and old-vs-new graph round trips using git worktrees at dd4b994 and 62f3a49. Every fix was re-derived from source, under condition (a): this round verifies those fixes. Mode is not degraded for any item below.
+- **Reviewed:** the fix round `git diff 8dc45c6..HEAD` in full (`code_kotlin.py`, `test_extractor_kotlin.py`, plan §5). `/increment`'s edit to this report was also checked. Context: all of `code_kotlin.py`, `parse_cache.py:38-46`, and `README.md:272-278`.
+- **Mode:** live run with the pinned `tree-sitter-kotlin==1.1.0` and `tree-sitter==0.26.0` (versions printed). Checks:
+  - the full suite and the slow suite (slow ×3);
+  - 16 hand probes;
+  - the r3 seeded fuzz re-run (seed 31, 6,000 files), plus an extended fuzz of 26,000 files (seeds 31, 4 and 77). The extended fuzz adds backtick names containing `{ }`, `//`, `'` and `"`, one-line backtick bodies, and nested-quote templates holding `/*`, `*/`, `//`, `'`, `` ` `` and `{ `. Every definition's (name, kind, parent, line) is checked against the known set;
+  - 10 mutations;
+  - CLI ×3 (fresh, cached, `--full`) and MCP builds of a git-marked six-language scratch repo;
+  - a dd4b994-worktree vs working-tree round trip on `tests/fixtures/sample_repo`.
+
+  Each fix was re-derived from source under condition (a): this round verifies those fixes. Mode is not degraded for any item below.
 - **Standards applied:** Anti-generosity standard applied (`/opt/aspark/standards/anti-generosity.md`). Active lens: `cli` (`/opt/aspark/lenses/cli.md`). Tool file: `/opt/aspark/tools/aspark-graph.md`.
-- **Graph (aspark-graph MCP):** I rebuilt it with `uv run aspark-graph build .`. The cache fell back on the new `kotlin-extractor=2` tag, as intended. `staleness`: fresh, 65 files. `impact --diff 62f3a49..HEAD`:
-  - `cli.py`, `server.py` and `test_cli_mcp_parity.py` reach shallow-clone-warning US-1 to US-4. As a result I read that spec's AC-1.3, AC-2.2 and NFR-5 and checked the parity test's key set (`test_cli_mcp_parity.py:213-216,297`).
-  - `build.py` reaches 16 stories. As a result I re-ran the dd4b994 byte-identity round trip.
-  - `code_kotlin.py`, `parse_cache.py` and `test_extractor_kotlin.py` have no linked stories. The plan declares no `files:` notes, so this is empty by construction, not an all-clear.
-  - `README.md` and plan.md are in `unknown_files`, so I read them by hand.
-  - `story_trace US-1`: T1 has `code: []`. The QA leg was not read (tool rule).
-- **Not reviewed:** `qa.md` (QA's placeholder, left untouched). F9 and F10 were not re-examined beyond one slow run.
+- **Graph (aspark-graph):** I rebuilt it with `uv run aspark-graph build .` (2 files re-parsed, 63 cached). `staleness`: fresh, 65 files. `impact --diff 8dc45c6..HEAD`:
+  - It reaches `code_kotlin.py` and `test_extractor_kotlin.py`, each with no linked stories. The plan has no `files:` notes, so this is empty by construction, not an all-clear. As a result I read all of `code_kotlin.py` and traced its `extract()` paths.
+  - plan.md and review.md are in `unknown_files`, so I read them by hand.
+  - `story_trace US-1`: T1 has `code: []`, and there are no QA checks. The QA leg was not read (tool rule).
+- **Not reviewed:** `qa.md` (QA's placeholder, left untouched). The adapters and `build.py` are unchanged since r3 and were not re-examined beyond the scratch builds.
 
 ## 2. Plan Conformance
 
 | Task | Implemented as planned? | Note |
 |---|---|---|
-| T1 | ✅ | Matches plan §5: blanking plus a same-length retry, no ERROR walking, `partial` on the File node, stderr and `partial_files`. Its correctness gaps are F14, F15 and F16. Plan §5's "named on stderr" is false for F15 files. |
-| T2 | ✅ | Unchanged since r2. The fan-out to every defining file (`build.py:248-258`, `311-327`) is a deviation, recorded in plan §5. |
-| T3 | ✅ | README `:272-279` updated. The new tests cover F1, F12 and F13; there is a gap for `is_missing` (F16). |
+| T1 | ✅ | Matches plan §5 as reworded by ff6a910: comments are blanked, literals are skipped verbatim, ERROR regions are not walked, and `partial` is reported on stderr and in `partial_files`. Plan §5 says "never walked" and "named on stderr". F18 (fixed) and F17 (open) were exceptions to those claims. |
+| T2 | ✅ | Unchanged since r2. The import fan-out is a deviation, recorded in plan §5. |
+| T3 | ✅ | The new tests cover F14, F15 and F16. The F20 test gap was closed by the reviewer. README `:276-278` is unchanged; its "is marked `partial`" claim is false for F17 files. |
 
 ## 3. Findings
 
@@ -63,14 +69,18 @@
 | F6 | Nit | `CLAUDE.md:81` | "five tree-sitter grammars" (reviewer fix, round 1). Round 2: the line now says "six". | fixed r2 |
 | F7 | Minor | `tests/test_build.py:59`, `tests/test_extractor_kotlin.py` | AC-3.1/AC-1.1 assertions were missing (reviewer fix, round 1). Round 2: `K.kt` is in the double-build test and `unparsed == set()` is asserted. | fixed r2 |
 | F8 | Minor | `.spark/kotlin-support/plan.md:25` | The risk statement understated F1/F2. Round 2: §5 was rewritten and the limit is in the README (this repo has no BACKLOG file). The sentence "Residual: … honest absence" is contradicted by F12; correct it together with F12. | fixed r2 |
-| F9 | Minor | `tests/test_incremental_bench.py:97` | Pre-existing: the NFR-1 benchmark (slow) is flaky on this machine. r3: one `-m slow` run, 4 passed; not re-examined. **Fix (EM):** settle it on the release machine before `/go-live`. A waiver is the user's call. | open |
-| F10 | Nit | `parse_cache.py:38-46` | Pre-existing: the cache tag does not include the go/rust grammar versions. r3: unchanged. **Fix:** add both to the tag. A waiver is the user's call. | open |
+| F9 | Minor | `tests/test_incremental_bench.py:97` | Pre-existing: the NFR-1 benchmark (slow) is flaky on this machine. r4: 1 of 3 `-m slow` runs failed it (`49.7% faster`, needs 50%); the other two passed 4/4. **Fix (EM):** settle it on the release machine before `/go-live`. A waiver is the user's call. | open |
+| F10 | Nit | `parse_cache.py:38-46` | Pre-existing: the cache tag does not include the go/rust grammar versions. r4: unchanged. **Fix:** add both to the tag. A waiver is the user's call. | open |
 | F11 | Nit | `tests/test_extractor_java.py:50` | Duplicate `test_all_six_languages_in_one_build`. Round 2: the Java test is renamed `test_all_languages_in_one_build` and covers Kotlin; the Kotlin copy is deleted. | fixed r2 |
 | F12 | Minor | `extractors/code_kotlin.py:36-43` | A comment with an unclosed `{` could fabricate an unflagged definition. r3: `/// Usage: { fun sample()` and `{ fun ghost() }` inside strings, raw strings, KDoc and nested block comments produce no definition in 6,000 fuzz files; the regression test is `test_comments_and_strings_do_not_confuse_the_retry`. | fixed r3 |
 | F13 | Minor | `extractors/code_kotlin.py:64-80` | Valid one-liners were flagged `partial`. r3: `data class D(…) { fun f() = a }`, `enum class E { A, B; fun f() = 1 }`, `interface I { fun a(); fun b() }`, and one-line `when`, `if` and lambda bodies all give complete definitions and `partial=False`. Mutation M3 (`partial=has_error`) fails a test. The fix works through `partial=errors>0`; hidden MISSING nodes are still uncounted, and these files lose no definitions. | fixed r3 |
-| F14 | Major | `extractors/code_kotlin.py:41,58-61,99-100` | **Wrong names, unflagged (regression vs 62f3a49).** When the retry tree wins, `_text` reads the **blanked copy**. The char-literal and string regexes also match inside backtick identifiers. Probe: `private class Fake { fun f() {} }` plus ``fun `user's name isn't empty`()`` gives ``UserTest.`user'          't empty` `` with `partial=False`; ``fun `returns "none" when`()`` is renamed the same way. Persisted in graph.json (`def:src/UserTest.kt::…`); 62f3a49 had the right id. **Why it matters:** a wrong graph fact (constitution §1), with a trigger that is common in Kotlin test suites. It also contradicts the README's "never guessed ones". **Fix:** read names from the original bytes (`source[n.start_byte:n.end_byte]`; same length makes this exact), and add a backtick-identifier alternative ``(`[^`\n]*`)`` first in `_LITERALS` that is kept unblanked. Add both probes as tests. | fixed |
-| F15 | Minor | `extractors/code_kotlin.py:40,74-80` | **Silent loss (regression vs 62f3a49).** The string regex is not template-aware, so `"${if (a) "{" else "}"}"` or `"${ f("{ … }") }"` exposes a brace. The retry then parses with 0 errors but its top-level children stop early. On this machine the uncovered tail, `"   "\nfun real() {}`, had `has_error=False`. Everything after the line is dropped with `partial=False`: no stderr line, no `partial_files`. Scratch `Silent.kt` lost `Lost`/`Lost.lost`. All 754 unflagged losses in the fuzz trace to these two shapes. **Why it matters:** this is the false negative the flag exists to prevent, and plan §5 says such files are "named on stderr". Rated Minor, not Major, because it needs a brace literal nested in `${…}` plus a file-level one-line body; common templates (`${map["k"]}`, `${if (x) "a" else "b"}`, `joinToString(",")`) are unaffected. **Fix:** blank the `string_literal`/`comment` byte ranges from the original tree instead of a regex, or treat a non-whitespace byte not covered by a top-level child of the retry as an error. Add the probe as a test. | fixed |
-| F16 | Minor | `extractors/code_kotlin.py:66`, `tests/test_extractor_kotlin.py` | Removing `or node.is_missing` passes all Kotlin and parity tests (M2). The term matters: `val x = (1` followed by `fun g() {}` has a visible MISSING `)`, loses `g`, and is flagged only because of that term. **Fix:** add this probe as a `partial is True` test. | fixed |
+| F14 | Major | `extractors/code_kotlin.py:37-61` | When the retry won, names were read from the blanked copy, so backtick names were renamed without a flag. r4: literals, including backtick names, are now kept verbatim (`:58`). The r3 probes ``UserTest.`user's name isn't empty` `` and ``UserTest.`returns "none" when` `` are correct with `partial=False`, by hand, in the scratch graph.json and in 26,000 fuzz files. Mutation M6 (blank literal interiors again) fails `test_retry_never_rewrites_identifiers_or_literals`. | fixed r4 |
+| F15 | Minor | `extractors/code_kotlin.py:37-61` | A brace literal inside a nested template dropped the rest of the file without a flag. r4: `"${if (a) "{" else "}"}"` and `"${ f("{ x }") }"` give every definition with `partial=False`, by hand and in the scratch `Silent.kt` (`Lost`, `Lost.lost` are present). The r3 fuzz (seed 31) has 0 unflagged losses. The test's `… or r.partial` disjunction is weak but adequate for "never unflagged". | fixed r4 |
+| F16 | Minor | `extractors/code_kotlin.py:66`, `tests/test_extractor_kotlin.py:185-186` | The `is_missing` term was untested. r4: removing `or node.is_missing` (M2) fails `test_missing_nodes_flag_the_file_partial`. | fixed r4 |
+| F17 | Minor | `extractors/code_kotlin.py:37-41,58` | **The comment regex is not a lexer.** It is not template-aware: a `"` inside `${…}` desyncs it. It is also not nesting-aware (`/\*.*?\*/`).<br>(a) **Silent loss:** in `val g = "${dir("/*")}"` / `fun top1() {}` / `class S3 {…}` / `val h = "${dir("*/")}"` / `class X4 { companion object { const val T = 1 } }`, the text from `/*` to `*/` is blanked as one comment. The retry then parses with 0 errors and drops `top1`, `S3` and `S3.s` with `partial=False`, so nothing appears on stderr or in `partial_files` (scratch `Desync.kt`). All 43 unflagged losses in 26,000 fuzz files need this `/*` … `*/` pair.<br>(b) **Flagged loss, regression vs 62f3a49:** a valid nested comment `/* a /* b */ c */` in a file with a one-line body is half-blanked. The file is then flagged `partial` and loses definitions that 62f3a49 recovered.<br>**Why it matters:** (a) is the false negative the flag exists to prevent. It is Minor, not Major, because it needs two nested-quote templates holding comment markers plus a one-line body.<br>**Limit:** valid Kotlin without a `/*` or `*/` inside a nested-quote template has no unflagged loss in the fuzz.<br>**Fix:** keep comments verbatim like literals (`out.append(m.group(0))`) — they are already tokens, so they are never rewritten. Measured as mutation M9: 0 unflagged, 0 wrong and 103 flagged files in 26,000, against 43, 0 and 4,374 now. All 402 tests pass, `Desync.kt` is complete, and F1 and F12 stay fixed. Update plan §5 and add the `Desync.kt` repro as a test. | fixed |
+| F18 | Major | `extractors/code_kotlin.py:90-91` | **Wrong fact: a mis-parented definition from a root ERROR.** When the chosen tree's root is itself `ERROR`, `_walk(root, …)` walks it, which is the F2 class through the root node. Repro (`test_root_error_is_never_walked`): `object O1 { fun o() = 1 }` followed by two `/* outer /* inner */ … */` lines and a companion one-liner emitted top-level `Function o` (parent `None`) with `partial=True`. Latent since d3742d9; it is exposed because F17(b)'s blanking makes the retry lose. **Reviewer fix:** `if root.type != "ERROR":` guards the walk. Now 0 wrong definitions in 26,000 fuzz files; scratch `RootErr.kt` is flagged and has no `o`. Mutation M10 (unguarded) fails the new test, and so would a regression. The test passes under F17's suggested fix. | fixed r4 |
+| F19 | Minor | `parse_cache.py:45` | ff6a910 changed `code_kotlin`'s output for the same bytes (F14 names), and so does F18. The tag stayed `kotlin-extractor=2`, against its own comment ("bump when … output for the same bytes changes"), so a cache from 8dc45c6 would keep serving the wrong names. **Reviewer fix:** bumped to `3`. Scratch builds are fresh, cached and `--full`, byte-identical. | fixed r4 |
+| F20 | Minor | `tests/test_extractor_kotlin.py:189-199` | Test gap: dropping the backtick token (M7) or rewriting inside literals (M8) passed every test. Both make ``fun `given { x } then`()`` flagged and lossy. **Reviewer fix:** `test_retry_keeps_backtick_names_with_braces_and_slashes` asserts the exact definition set; M7 and M8 now fail it. | fixed r4 |
 
 ## 4. Requirements Traceability
 
@@ -79,53 +89,57 @@ The spec has no NFRs. Anti-generosity binary grading applies to every cell.
 | Spec ID | Implemented at | Verdict |
 |---|---|---|
 | AC-1.1 | `extractors/base.py:56-57`, `extractors/__init__.py:25` | ✅ PASS — CLI build of scratch repo: `.kt`, `build.gradle.kts`, empty, random-bytes and bad-UTF-8 `.kt` all `language=kotlin`, no `unparsed`, exit 0 |
-| AC-1.2 | `extractors/code_kotlin.py:58-91,121-170` | ❌ FAIL — F1's trigger is fixed. But valid Kotlin with a brace literal inside a nested template drops every later `Class` node, unflagged (F15, `Silent.kt`). |
-| AC-1.3 | `extractors/code_kotlin.py:135-154` | ❌ FAIL — backtick-named functions are emitted under a **wrong** name (F14), and later functions are dropped unflagged (F15). |
+| AC-1.2 | `extractors/code_kotlin.py:53-91,157-170` | ❌ FAIL — the F14/F15 triggers are fixed. Valid Kotlin with a `/*` … `*/` pair in nested-quote templates still drops the `Class` node `S3` without a flag (F17a, scratch `Desync.kt`). |
+| AC-1.3 | `extractors/code_kotlin.py:135-154` | ❌ FAIL — names are now exact (F14 fixed; 0 wrong in 26,000 files). `top1` and `S3.s` are still dropped without a flag in the F17a repro. |
 | AC-2.1 (Should) | `build.py:248-258,311-341` | ✅ PASS — live: class, alias, isolated top-level-function and overloaded-function imports give File→File edges; overloads fan out to both files (F3 fixed) |
 | AC-2.2 (Should) | `build.py:328-329` | ✅ PASS — live: `com.ex.util.*` and `kotlinx.coroutines.launch` give no edge; a `*` inside a comment is not read as a wildcard |
 | AC-3.1 | `pyproject.toml:46`, `uv.lock` | ✅ PASS — pinned `==1.1.0`. The six-language scratch repo gave `0ac36af9…` from a fresh build, a cached build and `--full`, with identical stderr each time. A round-2 cache under HEAD falls back on the tag and gives the same bytes. The dd4b994 fixture gave `aafe108d…` under both the dd4b994 code and HEAD, with empty stderr on both. |
-| AC-3.2 | `tests/test_extractor_kotlin.py` | ✅ PASS — 11 Kotlin tests, and both multi-language tests cover Kotlin. Mutations M1, M3 and M4 are caught; M2 is not (F16). |
-| AC-3.3 | `README.md:272-279`, `README.md:298-299` | ✅ PASS — Kotlin is listed in "Supported languages" and the design guarantees. The "never guessed ones" claim is false until F14 is fixed. |
+| AC-3.2 | `tests/test_extractor_kotlin.py` | ✅ PASS — 15 Kotlin tests; both multi-language tests cover Kotlin. Mutations M2, M6, M7, M8 and M10 each fail a test. M9 passes, but M9 is F17's fix, not a defect. |
+| AC-3.3 | `README.md:272-279`, `README.md:298-299` | ✅ PASS — Kotlin is listed in "Supported languages" and in the design guarantees. "Never guessed ones" now holds (F18 fixed). "Is marked `partial`" is false for F17a files, and that is tracked there. |
 
 ## 5. What Was Checked
 
-- [x] Correctness: probed the hazards the caller asked for. Two produced wrong or lost definitions:
-  - Backtick names containing a `'…'` pair or `"…"` are renamed (F14). Backtick names containing `//` are lost but flagged.
-  - Nested-quote templates with a brace literal are lost, unflagged (F15).
-  These produced correct definitions:
-  - Char literals `'{'`, `'"'`, `'\''`, `'}'`.
-  - Raw strings, including those containing `"`, `""""…""""`, multi-line, and with a template.
-  - `//` in URL strings, KDoc, nested `/* /* */ */`, and `"it's { … }"`.
-  An unterminated string is flagged `partial`. Fuzz, 6,000 files: 0 fabricated definitions and 0 wrong lines.
-- [x] Non-functional: determinism holds (fresh, cached and `--full`), and non-Kotlin graphs are byte-identical to dd4b994 (see AC-3.1). No constitution §6 non-negotiable is violated. The §1 "honest absence beats a wrong link" principle is violated by F14.
-- [x] Error handling: no tracebacks. A partial file is reported once on stderr and exit stays 0. F15 files escape the flag.
-- [x] Security: no new input path. The regexes are linear and the 5 MB cap still applies.
-  - `cli` lens: no new flag or exit code, and stdout is unchanged. The diagnostic goes to stderr only. It is a separate category from shallow-clone NFR-5's single history notice; AC-1.3 there is unaffected because v0.7.1 had no Kotlin.
-  - MCP: `partial_files` is additive, and the parity test's key set is updated.
-- [x] Tests: `uv run pytest`: 398 passed. `-m slow`: 4 passed. Mutations: M1, M3 and M4 each fail one test. M2 (F16) and M5 (`<=`, a harmless equal-count case) pass.
-- [x] Readability: blanking and retry are small and commented. `kotlin-extractor=2` is a manual bump; its comment says when to bump it.
+- [x] Correctness: the caller's shapes are correct with `partial=False` under HEAD and the reviewer fixes:
+  - backtick names containing `'…'`, `"…"`, `{ x }` or `// /* */`, inside one-line bodies and as class names;
+  - extension functions;
+  - ``"${if (a) "{" else "}"}"`` and `"${ f("{ x }") }"`;
+  - nested-quote templates holding `//`, `'` and `` ` ``.
+
+  Fuzz results:
+  - r3 fuzz (seed 31): 5,420 exact, 578 flagged, 0 wrong, 0 unflagged.
+  - Extended fuzz (26,000 files): 0 wrong names, parents or lines after F18; 43 unflagged losses, all F17a; 4,374 flagged.
+- [x] Non-functional:
+  - The scratch repo gave `769dd4b9…` from a fresh build, a cached build, `--full` and MCP, with identical stderr each time.
+  - The non-Kotlin `sample_repo` gave `7a82e69c…` under both the dd4b994 worktree and the working tree, with identical stderr.
+  - No constitution §6 non-negotiable is violated. §1 "honest absence" is violated only by F17a.
+- [x] Error handling: no tracebacks. Partial files are reported once on stderr and in MCP `partial_files` (`['src/Bad.kt', 'src/RootErr.kt']`), and exit is 0. F17a files escape the flag.
+- [x] Security: no new input path. The token regex is linear; the 5 MB cap still applies.
+  - `cli` lens: no flag, exit-code or stdout change this round. Diagnostics stay on stderr.
+- [x] Tests: `uv run pytest`: 402 passed. `-m slow`: 1 of 3 runs failed the F9 benchmark at 49.7%; the other two passed 4/4. There are 10 mutations, listed in §3 and §4.
+- [x] Readability: the tokenizer is small and commented. The F18 guard carries its own comment.
 
 Open questions for the user/EM:
-- (a) `.spark/constitution.md` §3 still says "five grammars" and lists five languages. The constitution is user-owned, so it is left unedited.
+- (a) `.spark/constitution.md` §3 still says "five grammars" (`:39`). The constitution is user-owned, so it is left unedited.
 - (b) F9 and F10 are pre-existing. Waiving them is the user's call; they do not block this gate.
+- (c) F17 can instead be accepted as a documented limit. That is the user's call; the limit would then go in plan §5 and the README.
+- (d) The reviewer fixes F18, F19 and F20 are uncommitted in the working tree: `code_kotlin.py`, `parse_cache.py` and `test_extractor_kotlin.py`.
 
 ## 6. Verdict
 
-Changes requested. I verified the fix round live against the pinned grammar.
+Changes requested. I verified round 4 live against the pinned grammar.
 
-Confirmed fixed (r3):
-- **F1:** comment text no longer turns into code, and partial files are named on stderr and in `partial_files`, identically across CLI and MCP.
-- **F12:** comments and strings no longer fabricate definitions; 0 in 6,000 fuzz files.
-- **F13:** valid one-liners are complete and unflagged.
+Confirmed fixed (r4):
+- **F14:** backtick and other literal names are exact.
+- **F15:** brace literals in nested templates no longer drop the rest of the file.
+- **F16:** the MISSING term is tested.
 
-Determinism holds fresh, from cache and with `--full`, and the dd4b994 graph is byte-identical under the new code.
+The extended fuzz found a Major the earlier rounds missed. **F18:** a root `ERROR` node was walked, which fabricated a top-level function. It is latent since d3742d9 and exposed by the comment regex. I fixed it with a one-line guard and a test, together with the stale cache tag (F19) and a test gap (F20). After these fixes, 26,000 fuzz files contain no wrong definition.
 
-The regex blanking introduced two regressions that 62f3a49 did not have:
-- **F14 (Major, open).** When the retry wins, names are read from the blanked copy. A Kotlin test file with a one-line fake and a backtick test name containing two apostrophes or a quoted word gets a wrong `Function` id, with `partial=False`. That is a wrong graph fact, so AC-1.3 fails.
-- **F15 (Minor, open).** A brace literal inside a nested template drops the rest of the file, unflagged. AC-1.2 and AC-1.3 stay FAIL.
-- **F16 (Minor, open).** The `is_missing` term has no test.
+**F17 (Minor, open)** is the one remaining defect. The regex comment blanking is neither nesting-aware nor template-aware:
+- A `/*` … `*/` pair inside nested-quote templates silently drops definitions.
+- Valid nested comments now lose definitions in a flagged file, where 62f3a49 kept them.
 
-Fix F14 by reading names from the original bytes, which is a few lines, and land F15 and F16 with it. F9 and F10 are pre-existing and do not block.
+The trigger is narrow, so the severity is Minor. It is still a silent loss on valid Kotlin, so AC-1.2 and AC-1.3 stay FAIL under binary grading. The measured fix is one line: keep comments verbatim, like literals. It clears all 43 silent cases and cuts flagged files from 4,374 to 103. Alternatively, the user can accept F17 as a documented limit. F9 and F10 are pre-existing and do not block.
 
 ---
 
@@ -135,9 +149,9 @@ Fix F14 by reading names from the original bytes, which is a few lines, and land
 re-review, edit this same checklist in place — never duplicate it as a second gate.*
 
 - [x] No open Blocker findings
-- [ ] No open Major findings (or explicitly waived by the user, with reason recorded here) — F14 open
-- [ ] Every Must AC traces to implementing code; no constitution non-negotiable violated — AC-1.2/AC-1.3 trace to code but FAIL (F14, F15); no §6 non-negotiable violated
-- [x] All plan deviations documented and accepted — plan §5 records retry, blanking, `partial`, stderr/MCP and import fan-out; its "named on stderr" is false for F15 files (tracked there)
-- [x] Test suite runs green — `uv run pytest`: 398 passed; `-m slow`: 4 passed
-- [x] Line budget respected: Ist 133 / Soll ~150 (excluding HTML comments)
+- [x] No open Major findings (or explicitly waived by the user, with reason recorded here) — F14 fixed r4, F18 fixed r4 (reviewer)
+- [ ] Every Must AC traces to implementing code; no constitution non-negotiable violated — AC-1.2/AC-1.3 trace to code but FAIL (F17a); no §6 non-negotiable violated
+- [x] All plan deviations documented and accepted — plan §5 records retry, comment blanking, verbatim literals, `partial`, stderr/MCP and import fan-out; its "named on stderr" is false for F17a files (tracked there)
+- [x] Test suite runs green — `uv run pytest`: 402 passed; `-m slow`: 4 passed in 2 of 3 runs, the 3rd failed only the pre-existing F9 bench
+- [x] Line budget respected: Ist 147 / Soll ~150 (excluding HTML comments)
 - [ ] Status set to `passed` — `changes-requested`
