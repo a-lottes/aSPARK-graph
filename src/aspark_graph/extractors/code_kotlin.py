@@ -27,38 +27,38 @@ _BODIES = {"class_body", "enum_class_body"}
 
 # The pinned grammar needs a line break between a body's `{`/`}` and its members, so
 # one-line bodies (`class X { companion object { const val T = 1 } }`) parse as ERROR.
-# The retry parses a same-length copy in which (1) comments and string/char literals
-# are blanked, so a `{ ` inside them cannot be rewritten or read as code, and
-# (2) the spaces after `{` / before `}` become newlines. Same byte length, so every
-# offset (and therefore every original line number) is preserved.
+# The retry parses a same-length copy in which comments are blanked (so a `{ ` inside a
+# comment cannot be rewritten or read as code) and the spaces after `{` / before `}`
+# become newlines. String, char and backtick-name literals are skipped verbatim: they
+# are never rewritten, and the extractor never edits an identifier. Same byte length,
+# so every offset (and therefore every original line number) is preserved.
 _AFTER_OPEN = re.compile(rb"\{[ \t]+(?=[^\s}])")
 _BEFORE_CLOSE = re.compile(rb"(?<=[^\s{])[ \t]+(?=\})")
-_LITERALS = re.compile(
-    rb"//[^\n]*"                        # line comment
-    rb"|/\*.*?\*/"                      # block comment (non-nested)
-    rb'|"""(?:.|\n)*?"""'               # raw string
-    rb'|"(?:\\.|[^"\\\n])*"'            # string
-    rb"|'(?:\\.|[^'\\\n])+'",         # char literal
+_TOKENS = re.compile(
+    rb"(?P<comment>//[^\n]*|/\*.*?\*/)"
+    rb'|(?P<literal>"""(?:.|\n)*?"""|"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])+\'|`[^`\n]*`)',
     re.DOTALL,
 )
 
 
-def _blank(match: re.Match[bytes]) -> bytes:
-    """Blank a comment entirely; blank a literal's interior but keep its quotes, so
-    the literal stays a syntactically valid (empty-looking) expression."""
-    text = match.group(0)
-    if text.startswith(b"//") or text.startswith(b"/*"):
-        keep_head = keep_tail = 0
-    else:
-        keep_head = keep_tail = 3 if text.startswith(b'"""') else 1
-    mid = bytes(b if b == 0x0A else 0x20 for b in text[keep_head:len(text) - keep_tail])
-    return text[:keep_head] + mid + text[len(text) - keep_tail:]
+def _spaces(b: bytes) -> bytes:
+    return bytes(c if c == 0x0A else 0x20 for c in b)
+
+
+def _rewrite_code(code: bytes) -> bytes:
+    code = _AFTER_OPEN.sub(lambda m: b"{\n" + m.group(0)[2:], code)
+    return _BEFORE_CLOSE.sub(lambda m: b"\n" + m.group(0)[1:], code)
 
 
 def _normalize_for_retry(source: bytes) -> bytes:
-    source = _LITERALS.sub(_blank, source)
-    source = _AFTER_OPEN.sub(lambda m: b"{\n" + m.group(0)[2:], source)
-    return _BEFORE_CLOSE.sub(lambda m: b"\n" + m.group(0)[1:], source)
+    out: list[bytes] = []
+    pos = 0
+    for m in _TOKENS.finditer(source):
+        out.append(_rewrite_code(source[pos:m.start()]))
+        out.append(_spaces(m.group(0)) if m.lastgroup == "comment" else m.group(0))
+        pos = m.end()
+    out.append(_rewrite_code(source[pos:]))
+    return b"".join(out)
 
 
 def _error_count(node: Node) -> int:

@@ -168,3 +168,19 @@ def test_partial_files_are_named_on_stderr_and_mcp(tmp_path, capsys):
     from aspark_graph import server
     result = server.build_graph(str(tmp_path))
     assert result["partial_files"] == ["Bad.kt"]
+
+
+def test_retry_never_rewrites_identifiers_or_literals():  # review F14/F15
+    src = (
+        "class Fake { fun f() {} }\n"
+        "class UserTest {\n    fun `user's name isn't empty`() {}\n}\n"
+    ).encode()
+    names = {d.qualname for d in code_kotlin.extract("A.kt", src).definitions}
+    assert "UserTest.`user's name isn't empty`" in names
+    src = b'class A { fun a() = "${if (x) "{" else "}"}" }\nclass Lost { fun lost() {} }\n'
+    r = code_kotlin.extract("A.kt", src)
+    assert {"A", "A.a", "Lost", "Lost.lost"} <= {d.qualname for d in r.definitions} or r.partial
+
+
+def test_missing_nodes_flag_the_file_partial():  # review F16
+    assert code_kotlin.extract("A.kt", b"val x = (1\nfun g() {}\n").partial is True
