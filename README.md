@@ -296,7 +296,7 @@ first — `❌` fail, `⚠` unverified, `✅` pass — and by its words only whe
 ## Design guarantees (why you can trust the output)
 
 - **Deterministic.** Byte-identical rebuild on an unchanged repo; parse-affecting
-  dependencies are pinned exactly; a double-build test enforces it. The five
+  dependencies are pinned exactly; a double-build test enforces it. The
   tree-sitter grammars (Python, TypeScript, Java, Go, Rust, C#) and tree-sitter core
   are pinned with `==`, and the committed `uv.lock` is part of the determinism
   contract for the rest — a grammar version can change the node types it
@@ -316,7 +316,7 @@ first — `❌` fail, `⚠` unverified, `✅` pass — and by its words only whe
 
 ## Out of scope
 
-Languages beyond the five currently supported, an LLM/natural-language layer, precise
+Languages beyond those currently supported, an LLM/natural-language layer, precise
 call-graph resolution, a visualization UI, exports (Neo4j/GraphML/Obsidian), HTTP/team
 mode, and authenticated or remote MCP transport are out of scope. The current language
 support is Python, TypeScript/JavaScript, Java, Go, Rust, and C#.

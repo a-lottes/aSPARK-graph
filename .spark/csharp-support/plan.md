@@ -13,7 +13,7 @@
 **Handoff**
 - **Status:** `approved` (authoritative for `Status`). Written retroactively for commit a7334d8; T1–T4 describe what that commit already did.
 - **Summary:** C# follows the existing language pattern: a pure single-file extractor (`code_csharp.py`, five type kinds folded into `Class`, first namespace in the existing `package` field), plus a `csharp` branch in `build.py` that resolves `using` by exact match, type first, then namespace, and emits no edge when the match is ambiguous. Adapters are untouched.
-- **Open:** `8 tasks not done` (T5–T12). One is `blocked` on a PO ruling (T9: AC-3.1 does not match current behaviour). The rest are verification gaps, see §3.
+- **Open:** none. T5–T12 are done (see Increment notes); T9 was resolved by rewording AC-3.1 (spec §7 C-row, autonomous ruling).
 - **Binding ruling:** §3 Task Breakdown for current task status; a plan revision after review/QA findings updates §1/§3 in place, never a new section
 - **On conflict:** the numbered body below wins for everything except `Status`; log the mismatch as a finding at the next `/peer-review` and proceed — don't stop on it.
 
@@ -119,7 +119,7 @@ The tool is headless, so `/demo-day` does not apply (`constitution.md §8`). The
 - [x] Architecture decision includes rejected alternatives (a decision without alternatives is a guess)
 - [x] Architecture respects the constitution's technical constraints (the `==` pin, offline, honest absence and thin adapters all hold; §3's stack line is stale, R6)
 - [x] Every task maps to a user story — no orphan tasks, no story without tasks
-- [x] Every Must AC and every applicable NFR is covered by at least one task (AC-3.1's `.rb` half by T9, which is `blocked` on a PO ruling)
+- [x] Every Must AC and every applicable NFR is covered by at least one task (AC-3.1's `.rb` half by T9)
 - [x] Every task has a checkable definition of done
 - [x] Task order respects dependencies
 - [x] Test strategy covers every Must story

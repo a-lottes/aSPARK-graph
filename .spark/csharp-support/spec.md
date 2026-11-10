@@ -118,6 +118,7 @@
 |---|---|---|---|
 | C1 | 2026-11-10 | (Scope) Which C# type kinds become `Class`? | All five from the ticket plus record struct (A1). |
 | C2 | 2026-11-10 | (Data) Where do members and local functions nest? | Under the declaring type / enclosing function, same file only (A2). |
+| C3 | 2026-11-10 | (Scope) AC-3.1 claimed unmapped extensions stay `unparsed: true`; the build skips them (no node), before and after. | AC-3.1, Summary and Problem reworded to match actual behaviour; no code change (autonomous ruling, review F5). |
 | C3 | 2026-11-10 | (Integrations) Is `.csproj` parsing needed for `using` edges? | No, exact-match best-effort (A3). |
 | C4 | 2026-11-10 | (Edge cases) Same type name in several files? | No edge, honest absence (A5). |
 | C5 | 2026-11-10 | (Error) Malformed or empty source? | Tolerant parse; empty file is a parsed, empty `File` node (A7). |

@@ -167,3 +167,54 @@ def test_external_using_emits_no_edge_and_graph_is_consistent(tmp_path):
     assert _import_edges(graph) == []
     for e in graph.edges():
         assert graph.has_node(e["source"]) and graph.has_node(e["target"])
+
+
+# --- Review F1/F2: preprocessor blocks; AC-3.1 unmapped extension -------------
+
+def test_declarations_inside_preprocessor_blocks_are_extracted():
+    source = b"""#if NETFX
+using Acme.Legacy;
+#endif
+namespace N
+{
+#if A
+    class X { void M() {} }
+#elif B
+    class Y {}
+#else
+    class Z {}
+#endif
+    class C
+    {
+#if NET6_0_OR_GREATER
+        void New() {}
+#else
+        void Old() {}
+#endif
+    }
+}
+"""
+    r = code_csharp.extract("P.cs", source)
+    q = _quals(r)
+    for cls in ("X", "Y", "Z", "C"):
+        assert (cls, "Class") in q
+    for fn in ("X.M", "C.New", "C.Old"):
+        assert (fn, "Function") in q
+    assert [i.module for i in r.imports] == ["Acme.Legacy"]
+
+
+def test_same_type_in_both_preprocessor_branches_still_resolves(tmp_path):
+    (tmp_path / "T.cs").write_text("namespace N {\n#if A\n public class T {}\n#else\n public class T {}\n#endif\n}\n")
+    (tmp_path / "U.cs").write_text("using static N.T;\nclass U {}\n")
+    graph, _ = build_graph(tmp_path)
+    assert [(e["source"], e["target"]) for e in _import_edges(graph)] == [(file_id("U.cs"), file_id("T.cs"))]
+
+
+def test_unmapped_extension_gets_no_language_and_no_node(tmp_path):  # AC-3.1, second clause
+    assert language_for("x.rb") is None
+    (tmp_path / "x.rb").write_text("class Foo; end\n")
+    (tmp_path / "A.cs").write_text("class A {}\n")
+    graph, report = build_graph(tmp_path)
+    assert graph.get_node(file_id("x.rb")) is None
+    assert "x.rb" not in report.unparsed
+    assert graph.get_node(file_id("A.cs"))["language"] == "csharp"

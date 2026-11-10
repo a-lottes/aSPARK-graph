@@ -323,7 +323,9 @@ def _csharp_indexes(
             files.append(e.relpath)
         for d in e.definitions:
             if d.kind == "Class":
-                types.setdefault(f"{e.package}.{d.qualname}", []).append(e.relpath)
+                owners = types.setdefault(f"{e.package}.{d.qualname}", [])
+                if e.relpath not in owners:  # same type twice in one file (#if/#else) is not ambiguous
+                    owners.append(e.relpath)
     return types, namespaces
 
 

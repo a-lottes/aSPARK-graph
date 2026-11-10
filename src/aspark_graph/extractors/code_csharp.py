@@ -23,6 +23,9 @@ _TYPE_DECLS = {
 }
 _NAMESPACES = {"namespace_declaration", "file_scoped_namespace_declaration"}
 _MEMBER_FUNCS = {"method_declaration", "constructor_declaration"}
+# `#if`/`#elif`/`#else` blocks wrap declarations as children; every branch is
+# walked (best-effort: the build has no defined symbols to pick one).
+_PREPROC = {"preproc_if", "preproc_elif", "preproc_else"}
 
 
 def extract(relpath: str, source: bytes) -> FileExtraction:
@@ -57,6 +60,8 @@ def _walk(node: Node, parent: str | None, result: FileExtraction) -> None:
             _add_using(child, result)
         elif t in _TYPE_DECLS:
             _add_type(child, parent, result)
+        elif t in _PREPROC:
+            _walk(child, parent, result)
 
 
 def _add_using(node: Node, result: FileExtraction) -> None:
@@ -77,9 +82,12 @@ def _add_type(node: Node, parent: str | None, result: FileExtraction) -> None:
         Definition(qualname=qualname, kind="Class", line=node.start_point[0] + 1, parent=parent)
     )
     body = node.child_by_field_name("body")
-    if body is None:
-        return
-    for member in body.named_children:
+    if body is not None:
+        _add_members(body, qualname, result)
+
+
+def _add_members(container: Node, qualname: str, result: FileExtraction) -> None:
+    for member in container.named_children:
         if member.type in _MEMBER_FUNCS:
             mname = _name(member)
             if mname is not None:
@@ -90,6 +98,8 @@ def _add_type(node: Node, parent: str | None, result: FileExtraction) -> None:
                 _add_local_functions(member, mqual, result)
         elif member.type in _TYPE_DECLS:
             _add_type(member, qualname, result)  # nested type
+        elif member.type in _PREPROC:
+            _add_members(member, qualname, result)
 
 
 def _add_local_functions(node: Node, parent: str, result: FileExtraction) -> None:
