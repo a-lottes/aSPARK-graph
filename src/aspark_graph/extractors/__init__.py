@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from .base import FileExtraction, language_for
-from . import code_go, code_java, code_py, code_rust, code_ts
+from . import code_go, code_java, code_kotlin, code_py, code_rust, code_ts
 
 Extractor = Callable[[str, bytes], FileExtraction]
 
@@ -22,6 +22,7 @@ _REGISTRY: dict[str, Extractor] = {
     "java": code_java.extract,
     "go": code_go.extract,
     "rust": code_rust.extract,
+    "kotlin": code_kotlin.extract,
 }
 
 
