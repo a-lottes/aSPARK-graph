@@ -56,9 +56,16 @@ def test_double_build_six_language_repo_is_deterministic(tmp_path):  # go-rust-s
     (tmp_path / "C.java").write_text("public class C { public void m() {} }\n")
     (tmp_path / "d.go").write_text("package main\n\ntype Widget struct{}\n\nfunc (w *Widget) M() {}\n")
     (tmp_path / "e.rs").write_text("pub struct Widget {}\n\nimpl Widget {\n    pub fn m(&self) {}\n}\n")
+    (tmp_path / "F.cs").write_text(
+        "using Acme.Util;\nnamespace Acme.App { class F { class In {} void M() { int L() { return 1; } } } }\n"
+    )
+    (tmp_path / "G.cs").write_text("namespace Acme.Util { class G {} }\n")
     g1, _ = build_graph(tmp_path)
     g2, _ = build_graph(tmp_path)
     assert g1.to_dict() == g2.to_dict()
+    p1 = g1.save(tmp_path / "run1" / "graph.json")
+    p2 = g2.save(tmp_path / "run2" / "graph.json")
+    assert p1.read_text() == p2.read_text()  # C# included
 
 
 def test_double_build_byte_identical_at_default_path(tmp_path):  # AC-1.2 via CLI path

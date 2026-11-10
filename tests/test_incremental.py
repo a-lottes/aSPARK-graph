@@ -490,3 +490,14 @@ def test_incremental_build_queries_correct(tmp_path):
     full_graph, _ = build_graph(tmp_path, full=True)
 
     assert graph.to_dict() == full_graph.to_dict()
+
+
+def test_csharp_incremental_equals_full(tmp_path):
+    """`package` (namespace) round-trips through the parse cache: incremental == full."""
+    (tmp_path / "A.cs").write_text("using Acme.Util;\nnamespace Acme.App { class A { void M() {} } }\n")
+    (tmp_path / "B.cs").write_text("namespace Acme.Util { class B {} }\n")
+    _full_build(tmp_path)
+    full_text = default_graph_path(tmp_path).read_text()
+    g_inc, report = build_graph(tmp_path)
+    assert g_inc.save(tmp_path / "inc" / "graph.json").read_text() == full_text
+    assert '"imports"' in full_text

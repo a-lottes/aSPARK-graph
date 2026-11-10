@@ -296,3 +296,16 @@ def test_history_notice_iff_mcp_key_on_every_fixture(tmp_path, capsys, monkeypat
     assert not (result["shallow_history"] and result["no_git_history"])
     assert set(result) == _V071_BUILD_KEYS | {"shallow_history", "no_git_history"}
     assert (a / ".aspark-graph" / "graph.json").read_bytes() == (b / ".aspark-graph" / "graph.json").read_bytes()
+
+
+def test_csharp_repo_cli_equals_mcp(tmp_path, capsys):
+    repo = tmp_path / "cs"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "A.cs").write_text("using Acme.Util;\nnamespace Acme.App { class A { void M() {} } }\n")
+    (repo / "B.cs").write_text("namespace Acme.Util { class B {} }\n")
+    graph, _ = build_graph(repo)
+    graph.save(queries.default_graph_path(repo))
+    cli_out = _cli_json(capsys, ["query", "impact", "--repo", str(repo), "B.cs"])
+    assert cli_out == _mcp_data("impact", {"files": ["B.cs"], "repo": str(repo)})
+    cli_node = _cli_json(capsys, ["query", "get_node", "--repo", str(repo), "file:A.cs"])
+    assert cli_node == _mcp_data("get_node", {"id": "file:A.cs", "repo": str(repo)})

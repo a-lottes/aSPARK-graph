@@ -13,14 +13,14 @@
 
 **Handoff**
 - **Status:** `approved` (authoritative for `Status`).
-- **Summary:** `.cs` files are unparsed `File` nodes today; goal is C# at parity with Java/Go/Rust (File/Class/Function nodes, best-effort in-repo `using` imports) with non-C# graphs unchanged byte for byte.
+- **Summary:** `.cs` files get no structure today (the issue calls them unparsed `File` nodes; the build in fact skips unmapped extensions entirely); goal is C# at parity with Java/Go/Rust (File/Class/Function nodes, best-effort in-repo `using` imports) with non-C# graphs unchanged byte for byte.
 - **Open:** `none` (all assumptions in §3 are decided by the PO in autonomous mode; the approver should confirm them)
 - **Binding ruling:** §4 User Stories for the current stories; §7 Clarifications for what changed since the last round and why
 - **On conflict:** the numbered body below wins for everything except `Status`; log the mismatch as a finding at the next `/peer-review` and proceed.
 
 ## 1. Problem & Goal
 
-- **Problem:** The code layer covers Python, TS/JS, Java, Go and Rust (`constitution.md §3`). In a C# or polyglot repo every `.cs` file is an unparsed `File` node (`unparsed: true`), so `story_trace` and `impact` have no `extracted`-tier `Class`/`Function` structure and no `imports` edges to walk for C#. Only `declared` links from plan `files:` notes work. Felt by developers and agents on .NET repos with aSPARK trails.
+- **Problem:** The code layer covers Python, TS/JS, Java, Go and Rust (`constitution.md §3`). In a C# or polyglot repo `.cs` files yield no `Class`/`Function` structure, so `story_trace` and `impact` have no `extracted`-tier `Class`/`Function` structure and no `imports` edges to walk for C#. Only `declared` links from plan `files:` notes work. Felt by developers and agents on .NET repos with aSPARK trails.
 - **Goal:** Extend the existing extractor pattern to C#: `.cs` becomes `File`, `Class` and `Function` nodes with `contains` edges, plus best-effort in-repo `imports` edges from `using` directives, like Go and Rust.
 - **Success signal:**
   1. A built repo with `.cs` files has `Class`/`Function` nodes for them and no `unparsed` flag, shown by `tests/test_extractor_csharp.py` (granularity of `test_extractor_java.py`) and the multi-language build test including C#.
@@ -81,7 +81,7 @@
 
 **Acceptance criteria:**
 
-- [ ] AC-3.1: Given `.cs` in the extension map, when the extractor registry is queried, then `.cs` maps to `csharp`, and an unmapped extension (e.g. `.rb`) is still `unparsed: true`.
+- [ ] AC-3.1: Given `.cs` in the extension map, when the extractor registry is queried, then `.cs` maps to `csharp`, and an unmapped extension (e.g. `.rb`) gets no `csharp` language mapping (unchanged behaviour).
 - [ ] AC-3.2: Given one file each of Python, TS, JS, Java, Go, Rust and C# in one build, when built, then every file has a language-tagged `File` node with its definitions and none is `unparsed`.
 - [ ] AC-3.3: Given the tree-sitter C# grammar in `pyproject.toml`, when inspected, then it is pinned with `==`.
 - [ ] AC-3.4: Given the README, when read, then "Supported languages" and the design-guarantees text list C# (held by `tests/test_readme.py`).
