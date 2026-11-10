@@ -490,3 +490,27 @@ def test_incremental_build_queries_correct(tmp_path):
     full_graph, _ = build_graph(tmp_path, full=True)
 
     assert graph.to_dict() == full_graph.to_dict()
+
+
+def test_kotlin_registered_after_unregistered_build_is_parsed_once(tmp_path, monkeypatch):
+    """kotlin-support AC-3.5: no stale unparsed .kt entry survives in the cache."""
+    from aspark_graph import extractors
+
+    (tmp_path / "a.py").write_text("def a(): pass\n")
+    (tmp_path / "K.kt").write_text("class K\n")
+    with monkeypatch.context() as m:
+        m.setitem(extractors._REGISTRY, "kotlin", None)
+        first, _ = build_graph(tmp_path)
+        first.save(default_graph_path(tmp_path))
+    assert first.get_node("file:K.kt").get("unparsed") is True
+
+    second, report = build_graph(tmp_path)
+    node = second.get_node("file:K.kt")
+    assert not node.get("unparsed") and node["language"] == "kotlin"
+    assert second.has_node("def:K.kt::K") or any(n["type"] == "Class" and n.get("file") == "K.kt" for n in second.nodes())
+    assert report.reparsed == 1 and report.cached == 1
+    assert first.get_node("file:a.py") == second.get_node("file:a.py")
+
+
+def test_version_tag_includes_kotlin_grammar():
+    assert ":tree-sitter-kotlin=" in parse_cache._version_tag()

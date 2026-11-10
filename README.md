@@ -272,10 +272,13 @@ ones. The exit code and the stdout format are unchanged, and on a full clone
 Code extraction covers **Python, TypeScript/JavaScript, Java, Go, Rust and Kotlin** (tree-sitter).
 Kotlin (`.kt`, `.kts`) yields `File`, `Class` (class, data class, object, interface, enum class,
 companion object) and `Function` (including extension functions) nodes; `import`
-directives resolve best-effort to in-repo files by `package` header (wildcard imports resolve
-to no edge). Multiplatform `expect`/`actual` pairing is not modelled.
-Files in other languages are recorded as unparsed `File` nodes — the build never
-fails on an unknown language.
+directives resolve best-effort to in-repo files by `package` header.
+Known Kotlin limits: wildcard imports (`import a.b.*`), nested-class imports and names
+declared in more than one file resolve to no edge; the grammar can misparse some one-line
+forms such as `class A { fun m() {} }` (multi-line source is fine); Multiplatform
+`expect`/`actual` pairing is not modelled.
+Files with an unrecognised extension get no node — the build never fails on an unknown
+language. A known language whose extractor is unavailable is recorded as an unparsed `File`.
 
 ## Artifacts read
 

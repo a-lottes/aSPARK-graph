@@ -43,6 +43,26 @@ def _prepare(tmp_path):
     return str(tmp_path)
 
 
+def test_kotlin_queries_cli_equals_mcp(tmp_path, capsys):  # kotlin-support AC-3.4
+    work = tmp_path / "repo"
+    shutil.copytree(SAMPLE_REPO, work)
+    (work / "src" / "demo" / "Widget.kt").write_text("package demo\n\nclass Widget {\n    fun render() {}\n}\n")
+    graph, _ = build_graph(work)
+    graph.save(queries.default_graph_path(work))
+    repo = str(work)
+    for tool, argv, params in (
+        ("find_nodes", ["find_nodes", "Widget"], {"query": "Widget"}),
+        ("impact", ["impact", "src/demo/Widget.kt"], {"files": ["src/demo/Widget.kt"]}),
+        ("story_trace", ["story_trace", "US-1", "--feature", "demo"], {"story": "US-1", "feature": "demo"}),
+    ):
+        cli_out = _cli_json(capsys, ["query", argv[0], "--repo", repo, *argv[1:]])
+        assert cli_out == _mcp_data(tool, {**params, "repo": repo})
+    assert "Widget" in json.dumps(_mcp_data("find_nodes", {"query": "Widget", "repo": repo}))
+    src = Path(cli.__file__).parent
+    for name in ("cli.py", "server.py"):
+        assert "kotlin" not in (src / name).read_text().lower()
+
+
 def test_story_trace_cli_equals_mcp(tmp_path, capsys):
     repo = _prepare(tmp_path)
     cli_out = _cli_json(capsys, ["query", "story_trace", "--repo", repo, "US-1", "--feature", "demo"])

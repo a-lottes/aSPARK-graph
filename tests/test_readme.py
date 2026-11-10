@@ -115,3 +115,11 @@ def test_shallow_clone_warning_t15_no_blanket_graph_json_claim():
     flat = " ".join(README.split())
     assert "and `graph.json` stay the same" not in flat
     assert "never extra ones" in flat
+
+
+def test_kotlin_support_ac_4_1_4_3_kotlin_documented_with_known_limits():
+    normalized = " ".join(README.split())
+    for needle in ("`.kt`", "`.kts`", "one-line", "wildcard", "Kotlin"):
+        assert needle in normalized
+    guarantees = normalized[normalized.index("Design guarantees"):]
+    assert "Kotlin" in guarantees

@@ -304,38 +304,37 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
     return index
 
 
-def _kotlin_symbol_index(extractions: list[FileExtraction]) -> dict[str, str]:
-    """Map ``package.Name`` -> relpath for top-level Kotlin classes and functions.
+def _kotlin_symbol_index(extractions: list[FileExtraction]) -> dict[str, set[str]]:
+    """Map ``package.name`` -> the files declaring that top-level name.
 
     Kotlin does not tie a package to a directory, so the declared ``package``
-    header is the key. The first writer wins (files are visited in sorted order).
+    header is the key. An extension function ``String.shout`` is imported as
+    ``package.shout``, so the key uses the last qualname segment. A name
+    declared in several files (overloads, split declarations) keeps all of
+    them, so the resolver can refuse the ambiguous import.
     """
-    index: dict[str, str] = {}
+    index: dict[str, set[str]] = {}
     for e in extractions:
         if e.language != "kotlin":
             continue
         prefix = f"{e.package}." if e.package else ""
         for d in e.definitions:
             if d.parent is None:
-                index.setdefault(f"{prefix}{d.qualname}", e.relpath)
+                index.setdefault(f"{prefix}{d.qualname.rsplit('.', 1)[-1]}", set()).add(e.relpath)
     return index
 
 
-def _resolve_kotlin_import(imp, index: dict[str, str]) -> str | None:
-    """Exact match, else strip trailing segments (``pkg.Outer.Inner`` -> ``pkg.Outer``).
+def _resolve_kotlin_import(imp, index: dict[str, set[str]]) -> str | None:
+    """Exact match on ``package.name``; ambiguous, wildcard or nested -> no edge.
 
-    A wildcard import (``pkg.*``) names no single file and resolves to no edge.
+    Honest absence beats a wrong link: ``pkg.*`` names no single file, a name
+    declared in more than one file cannot be attributed, and ``pkg.Outer.Inner``
+    is not a top-level key.
     """
-    path = imp.module
-    if path.endswith(".*"):
+    files = index.get(imp.module)
+    if files is None or len(files) != 1:
         return None
-    parts = path.split(".")
-    while parts:
-        hit = index.get(".".join(parts))
-        if hit:
-            return hit
-        parts.pop()
-    return None
+    return next(iter(files))
 
 
 def _go_package_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
