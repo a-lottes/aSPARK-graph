@@ -38,6 +38,7 @@ class FileExtraction:
     definitions: list[Definition] = field(default_factory=list)
     imports: list[Import] = field(default_factory=list)
     package: str | None = None  # Java package; None for languages without the notion
+    partial: bool = False  # the grammar could not parse the whole file; definitions may be missing
 
 
 # extension -> language name; the build uses this to pick an extractor and to

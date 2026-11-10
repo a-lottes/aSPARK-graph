@@ -22,7 +22,7 @@ Follow the Java/Go/Rust pattern: pure `code_kotlin.py` (bytes in, `FileExtractio
 
 ## 5. Risks & Mitigations
 
-The grammar mis-parses some single-line constructs (class bodies on one line); real multi-line code parses cleanly, and the extractor recovers definitions from `ERROR` regions.
+The pinned grammar needs a line break after `{` and before `}` of a body: one-line bodies (`class X { companion object { const val T = 1 } }`) parse as ERROR and, unrecovered, silently erase every later definition in the file. Mitigation: retry the parse on a same-length copy with those spaces turned into newlines (original line numbers are kept); ERROR regions are never walked (recovered members would be mis-parented); a file the grammar still cannot parse is marked `partial: true` on its `File` node and documented in the README. Residual: a partial file may lack definitions (honest absence). Deviation recorded: this fix-round also made Kotlin imports fan out to every file defining the same top-level name (extension overloads).
 
 ## ✅ PLAN GATE
 

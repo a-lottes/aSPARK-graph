@@ -8,6 +8,9 @@ annotation processing.
 
 from __future__ import annotations
 
+import re
+from bisect import bisect_right
+
 import tree_sitter_kotlin
 from tree_sitter import Language, Node, Parser
 
@@ -22,9 +25,35 @@ _TYPE_DECLS = {"class_declaration", "object_declaration"}
 _BODIES = {"class_body", "enum_class_body"}
 
 
+# The pinned grammar needs a line break between a body's `{`/`}` and its members, so
+# one-line bodies (`class X { companion object { const val T = 1 } }`) parse as ERROR.
+# The retry swaps those spaces for newlines: same byte length, so every offset (and
+# therefore every original line number) is preserved.
+_AFTER_OPEN = re.compile(rb"\{[ \t]+(?=[^\s}])")
+_BEFORE_CLOSE = re.compile(rb"(?<=[^\s{])[ \t]+(?=\})")
+
+
+def _normalize_one_line_bodies(source: bytes) -> bytes:
+    source = _AFTER_OPEN.sub(lambda m: b"{\n" + m.group(0)[2:], source)
+    return _BEFORE_CLOSE.sub(lambda m: b"\n" + m.group(0)[1:], source)
+
+
+def _error_count(node: Node) -> int:
+    if node.type == "ERROR" or node.is_missing:
+        return 1
+    if not node.has_error:
+        return 0
+    return sum(_error_count(c) for c in node.children)
+
+
 def extract(relpath: str, source: bytes) -> FileExtraction:
     tree = _PARSER.parse(source)
-    result = FileExtraction(relpath=relpath, language="kotlin")
+    if tree.root_node.has_error:
+        retry = _PARSER.parse(_normalize_one_line_bodies(source))
+        if _error_count(retry.root_node) < _error_count(tree.root_node):
+            tree = retry
+    line_starts = [0] + [m.end() for m in re.finditer(rb"\n", source)]
+    result = FileExtraction(relpath=relpath, language="kotlin", partial=tree.root_node.has_error)
     root = tree.root_node
     for child in root.named_children:
         t = child.type
@@ -34,8 +63,13 @@ def extract(relpath: str, source: bytes) -> FileExtraction:
                 result.package = _text(qi)
         elif t == "import":
             _add_import(child, result)
-    _walk(root, parent=None, result=result)
+    _walk(root, None, result, line_starts)
     return result
+
+
+def _line(node: Node, lines: list[int]) -> int:
+    """1-based line in the ORIGINAL source (the retry parse keeps byte offsets)."""
+    return bisect_right(lines, node.start_byte)
 
 
 def _text(node: Node) -> str:
@@ -60,18 +94,18 @@ def _add_import(node: Node, result: FileExtraction) -> None:
     result.imports.append(Import(module=module, relative=False))
 
 
-def _walk(node: Node, parent: str | None, result: FileExtraction) -> None:
+def _walk(node: Node, parent: str | None, result: FileExtraction, lines: list[int]) -> None:
     for child in node.named_children:
         t = child.type
         if t in _TYPE_DECLS:
-            _add_type(child, parent, result)
+            _add_type(child, parent, result, lines)
         elif t == "companion_object":
-            _add_type(child, parent, result, default_name="Companion")
+            _add_type(child, parent, result, lines, default_name="Companion")
         elif t == "function_declaration":
-            _add_function(child, parent, result)
-        elif t == "ERROR":
-            # Recover definitions from a locally malformed region.
-            _walk(child, parent, result)
+            _add_function(child, parent, result, lines)
+        # ERROR regions are deliberately not walked: recovered members would get the
+        # wrong parent (a wrong link is worse than honest absence); the file is flagged
+        # `partial` instead.
 
 
 def _function_name(node: Node) -> str | None:
@@ -86,25 +120,27 @@ def _function_name(node: Node) -> str | None:
     return name
 
 
-def _add_function(node: Node, parent: str | None, result: FileExtraction) -> None:
+def _add_function(node: Node, parent: str | None, result: FileExtraction, lines: list[int]) -> None:
     name = _function_name(node)
     if name is None:
         return
     qualname = f"{parent}.{name}" if parent else name
     result.definitions.append(
-        Definition(qualname=qualname, kind="Function", line=node.start_point[0] + 1, parent=parent)
+        Definition(qualname=qualname, kind="Function", line=_line(node, lines), parent=parent)
     )
 
 
-def _add_type(node: Node, parent: str | None, result: FileExtraction, default_name: str | None = None) -> None:
+def _add_type(
+    node: Node, parent: str | None, result: FileExtraction, lines: list[int], default_name: str | None = None
+) -> None:
     ident = _first(node, "identifier")
     name = _text(ident) if ident is not None else default_name
     if name is None:
         return
     qualname = f"{parent}.{name}" if parent else name
     result.definitions.append(
-        Definition(qualname=qualname, kind="Class", line=node.start_point[0] + 1, parent=parent)
+        Definition(qualname=qualname, kind="Class", line=_line(node, lines), parent=parent)
     )
     for body in node.named_children:
         if body.type in _BODIES:
-            _walk(body, qualname, result)
+            _walk(body, qualname, result, lines)

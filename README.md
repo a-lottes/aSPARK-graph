@@ -272,7 +272,10 @@ ones. The exit code and the stdout format are unchanged, and on a full clone
 Code extraction covers **Python, TypeScript/JavaScript, Java, Go, Rust and Kotlin** (tree-sitter;
 Kotlin covers `.kt` and `.kts`: classes, data classes, objects, interfaces, enums,
 functions incl. extension and companion members, and best-effort in-repo `import`
-resolution; KMP `expect`/`actual` pairing is out of scope).
+resolution; KMP `expect`/`actual` pairing is out of scope). Known limit: the pinned
+Kotlin grammar cannot parse some valid code (e.g. a body written without spaces,
+`class A{fun g(){}}`); such a file keeps its `File` node, is marked `partial: true`,
+and contributes only the definitions parsed cleanly — never guessed ones.
 Files in other languages are recorded as unparsed `File` nodes — the build never
 fails on an unknown language.
 
@@ -315,7 +318,7 @@ first — `❌` fail, `⚠` unverified, `✅` pass — and by its words only whe
 
 ## Out of scope
 
-Languages beyond the five currently supported, an LLM/natural-language layer, precise
+Languages beyond the six currently supported, an LLM/natural-language layer, precise
 call-graph resolution, a visualization UI, exports (Neo4j/GraphML/Obsidian), HTTP/team
 mode, and authenticated or remote MCP transport are out of scope. The current language
 support is Python, TypeScript/JavaScript, Java, Go, Rust, and Kotlin.

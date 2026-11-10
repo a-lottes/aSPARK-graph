@@ -88,10 +88,13 @@ def test_build_resolves_kotlin_import(tmp_path):
     app = tmp_path / "src" / "com" / "example" / "app"
     util.mkdir(parents=True)
     app.mkdir(parents=True)
-    (util / "Helper.kt").write_text("package com.example.util\n\nclass Helper {\n    fun format() = \"\"\n}\n\nfun topLevel() {}\n")
+    (util / "Helper.kt").write_text("package com.example.util\n\nclass Helper {\n    fun format() = \"\"\n}\n")
+    (util / "Funcs.kt").write_text("package com.example.util\n\nfun topLevel() {}\n")
+    (util / "Ext1.kt").write_text("package com.example.util\n\nfun String.toast() {}\n")
+    (util / "Ext2.kt").write_text("package com.example.util\n\nfun Int.toast() {}\n")
     (app / "Widget.kt").write_text(
         "package com.example.app\n\nimport com.example.util.Helper\nimport com.example.util.topLevel\n"
-        "import com.example.util.Helper.Nested\nimport kotlin.collections.List\nimport com.example.util.*\n\n"
+        "import com.example.util.Helper.Nested\nimport com.example.util.toast\nimport kotlin.collections.List\nimport com.example.util.*\n\n"
         "class Widget\n"
     )
     graph, _ = build_graph(tmp_path)
@@ -99,18 +102,33 @@ def test_build_resolves_kotlin_import(tmp_path):
     src = file_id("src/com/example/app/Widget.kt")
     assert (src, file_id("src/com/example/util/Helper.kt"), "imports") in edges
     imports_from_src = {t for s, t, ty in edges if s == src and ty == "imports"}
-    assert imports_from_src == {file_id("src/com/example/util/Helper.kt")}  # stdlib/wildcard: no edge
+    # class, function (own file) and overloaded function (fans out to both files);
+    # stdlib/wildcard: no edge
+    assert imports_from_src == {
+        file_id(f"src/com/example/util/{n}.kt") for n in ("Helper", "Funcs", "Ext1", "Ext2")
+    }
 
 
-def test_all_six_languages_in_one_build(tmp_path):
-    (tmp_path / "a.py").write_text("def f():\n    return 1\n")
-    (tmp_path / "b.ts").write_text("export function g() { return 1; }\n")
-    (tmp_path / "C.java").write_text("public class C { public void m() {} }\n")
-    (tmp_path / "d.go").write_text("package main\n\nfunc D() int { return 1 }\n")
-    (tmp_path / "e.rs").write_text("pub fn e() -> i32 { 1 }\n")
-    (tmp_path / "K.kt").write_text("class K {\n    fun k() {}\n}\n")
+def test_one_line_bodies_are_recovered_with_original_line_numbers():  # review F1
+    src = b'class X { companion object { const val TAG = "x" } }\n\nclass L { fun login() {} }\nfun f() {}\n'
+    r = code_kotlin.extract("A.kt", src)
+    by = {d.qualname: d for d in r.definitions}
+    assert {"X", "X.Companion", "L", "L.login", "f"} <= set(by)
+    assert by["X.Companion"].parent == "X" and by["L.login"].parent == "L"
+    assert (by["X"].line, by["L"].line, by["f"].line) == (1, 3, 4)
+
+
+def test_unparseable_file_is_partial_and_never_mis_parented():  # review F2
+    r = code_kotlin.extract("A.kt", b"class A{fun g(){}}\nclass B{fun h(){}}\n")
+    assert r.partial is True
+    assert all(d.parent is None or d.parent in {x.qualname for x in r.definitions} for d in r.definitions)
+    assert not any(d.kind == "Function" and d.parent is None for d in r.definitions)
+
+
+def test_partial_flag_reaches_file_node_only_when_true(tmp_path):
+    (tmp_path / "Bad.kt").write_text("class A{fun g(){}}\nclass B{fun h(){}}\n")
+    (tmp_path / "Good.kt").write_text("class G {\n    fun g() {}\n}\n")
     graph, _ = build_graph(tmp_path)
-    langs = {n.get("language") for n in graph.nodes() if n["type"] == "File"}
-    assert {"python", "typescript", "java", "go", "rust", "kotlin"} <= langs
-    assert graph.has_node(definition_id("K.kt", "K"))
-    assert graph.has_node(definition_id("K.kt", "K.k"))
+    nodes = {n["id"]: n for n in graph.nodes()}
+    assert nodes[file_id("Bad.kt")].get("partial") is True
+    assert "partial" not in nodes[file_id("Good.kt")]

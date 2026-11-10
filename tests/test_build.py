@@ -56,6 +56,7 @@ def test_double_build_six_language_repo_is_deterministic(tmp_path):  # go-rust-s
     (tmp_path / "C.java").write_text("public class C { public void m() {} }\n")
     (tmp_path / "d.go").write_text("package main\n\ntype Widget struct{}\n\nfunc (w *Widget) M() {}\n")
     (tmp_path / "e.rs").write_text("pub struct Widget {}\n\nimpl Widget {\n    pub fn m(&self) {}\n}\n")
+    (tmp_path / "K.kt").write_text("class K {\n    companion object {\n        fun k() {}\n    }\n}\n")  # kotlin-support AC-3.1
     g1, _ = build_graph(tmp_path)
     g2, _ = build_graph(tmp_path)
     assert g1.to_dict() == g2.to_dict()

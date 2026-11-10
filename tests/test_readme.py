@@ -66,7 +66,8 @@ def _artifacts_section() -> str:
 
 
 def test_current_names_ac_6_1_no_stale_language_count():
-    assert not re.search(r"\bfive\b[^.]{0,20}(languages|grammars)", README, re.IGNORECASE)
+    # Any "five" in the README is a stale language/grammar count (six since kotlin-support).
+    assert not re.search(r"\bfive\b", README, re.IGNORECASE)
 
 
 def test_current_names_ac_6_1_languages_stated():

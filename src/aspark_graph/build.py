@@ -165,7 +165,8 @@ def build_graph(repo_root: str | Path, *, full: bool = False) -> tuple[Graph, Bu
             extraction = extractor(relpath, source)
             report.reparsed += 1
 
-        graph.add_node(file_id(relpath), NodeType.FILE, language=language, hash=digest, package=extraction.package)
+        file_attrs = {"partial": True} if extraction.partial else {}  # only when true: other graphs stay byte-identical
+        graph.add_node(file_id(relpath), NodeType.FILE, language=language, hash=digest, package=extraction.package, **file_attrs)
         _add_definitions(graph, extraction)
         extractions.append(extraction)
         cache_triples.append((relpath, digest, extraction))
@@ -244,10 +245,15 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
     for e in extractions:
         src = file_id(e.relpath)
         for imp in e.imports:
-            if e.language == "go":
+            if e.language in ("go", "kotlin"):
                 # A Go import addresses a package (a directory), not a single
-                # file, so an unambiguous match can fan out to several files.
-                for target_rel in _resolve_go_import(imp, e.relpath, go_index):
+                # file, so a match can fan out to several files; a Kotlin
+                # function name can likewise live in several files.
+                targets = (
+                    _resolve_go_import(imp, e.relpath, go_index) if e.language == "go"
+                    else _resolve_kotlin_import(imp.module, kotlin_index)
+                )
+                for target_rel in targets:
                     if target_rel in rel_index and target_rel != e.relpath:
                         graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
                 continue
@@ -260,8 +266,6 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
                 target_rel = java_index.get(imp.module)
             elif e.language == "rust":
                 target_rel = _resolve_rust_import(imp, e.relpath, rust_index)
-            elif e.language == "kotlin":
-                target_rel = _resolve_kotlin_import(imp.module, kotlin_index)
             # Only emit an edge when we resolve to a file that is in the graph.
             if target_rel and target_rel in rel_index and target_rel != e.relpath:
                 graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
@@ -304,34 +308,37 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
     return index
 
 
-def _kotlin_symbol_index(extractions: list[FileExtraction]) -> dict[str, str]:
-    """Map fully-qualified top-level Kotlin names (``package.Name``) -> relpath.
+def _kotlin_symbol_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
+    """Map fully-qualified top-level Kotlin names (``package.Name``) -> its file(s).
 
     Covers top-level classes/objects *and* top-level functions (Kotlin imports
-    both). First writer wins (files are visited in sorted order)."""
-    index: dict[str, str] = {}
+    both). Several files can define the same function name in one package
+    (extension overloads), so an import fans out to all of them."""
+    index: dict[str, list[str]] = {}
     for e in extractions:
         if e.language != "kotlin":
             continue
         prefix = f"{e.package}." if e.package else ""
         for d in e.definitions:
             if d.parent is None:
-                index.setdefault(f"{prefix}{d.qualname}", e.relpath)
+                files = index.setdefault(f"{prefix}{d.qualname}", [])
+                if e.relpath not in files:
+                    files.append(e.relpath)
     return index
 
 
-def _resolve_kotlin_import(module: str, index: dict[str, str]) -> str | None:
+def _resolve_kotlin_import(module: str, index: dict[str, list[str]]) -> list[str]:
     """Best-effort: exact name, else walk up (``a.Outer.Inner`` -> ``a.Outer``).
 
     A wildcard import names a package, not a file: no edge. Stdlib/third-party
     names match nothing and emit no edge."""
     if module.endswith(".*"):
-        return None
+        return []
     while True:
         if module in index:
             return index[module]
         if "." not in module:
-            return None
+            return []
         module = module.rsplit(".", 1)[0]
 
 

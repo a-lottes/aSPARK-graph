@@ -70,6 +70,7 @@ def _serialize_extraction(e: FileExtraction, sha256: str) -> dict:
         "language": e.language,
         "package": e.package,
         "sha256": sha256,
+        **({"partial": True} if e.partial else {}),
     }
 
 
@@ -94,6 +95,7 @@ def _deserialize_extraction(relpath: str, data: dict) -> FileExtraction:
         definitions=definitions,
         imports=imports,
         package=data.get("package"),
+        partial=data.get("partial", False),
     )
 
 
