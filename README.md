@@ -270,7 +270,9 @@ ones. The exit code and the stdout format are unchanged, and on a full clone
 ## Supported languages
 
 Code extraction covers **Python, TypeScript/JavaScript, Java, Go, Rust and Kotlin** (tree-sitter).
-Files in other languages are recorded as unparsed `File` nodes — the build never
+Kotlin caveat: the pinned grammar mis-parses a class body written on one line
+(`class A { val x = 1 }`); members there are recovered best-effort and may be
+missed. Files in other languages are recorded as unparsed `File` nodes — the build never
 fails on an unknown language.
 
 ## Artifacts read

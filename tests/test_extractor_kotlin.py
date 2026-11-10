@@ -133,3 +133,36 @@ def test_kotlin_double_build_deterministic(tmp_path):
     g1, _ = build_graph(tmp_path)
     g2, _ = build_graph(tmp_path)
     assert g1.to_dict() == g2.to_dict()
+
+
+def test_kotlin_visibility_maps_to_exported():
+    r = code_kotlin.extract("V.kt", b"private fun hidden() {}\n\ninternal class Inside {\n}\n\nfun shown() {}\n")
+    by = {d.qualname: d.exported for d in r.definitions}
+    assert by == {"hidden": False, "Inside": False, "shown": True}
+
+
+def test_kotlin_package_only_and_comment_only_files(tmp_path):
+    (tmp_path / "P.kt").write_text("package only.here\n")
+    (tmp_path / "C.kt").write_text("// nothing but a comment\n")
+    graph, _ = build_graph(tmp_path)
+    for name in ("P.kt", "C.kt"):
+        node = graph.get_node(file_id(name))
+        assert node is not None and node["language"] == "kotlin"
+        assert not node.get("unparsed")
+
+
+def test_kotlin_unregistered_extractor_is_unparsed(tmp_path, monkeypatch):
+    from aspark_graph import extractors
+
+    monkeypatch.setitem(extractors._REGISTRY, "kotlin", None)
+    monkeypatch.setattr(extractors, "get_extractor", lambda lang: extractors._REGISTRY.get(lang))
+    (tmp_path / "K.kt").write_text("class K {\n}\n")
+    graph, report = build_graph(tmp_path)
+    assert graph.get_node(file_id("K.kt")).get("unparsed") is True
+    assert "K.kt" in report.unparsed
+
+
+def test_kotlin_malformed_source_builds_without_error(tmp_path):
+    (tmp_path / "M.kt").write_text("class {{{ fun ( ) = \n")
+    graph, _ = build_graph(tmp_path)
+    assert graph.get_node(file_id("M.kt")) is not None
