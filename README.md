@@ -277,9 +277,10 @@ resolved). Multiplatform `expect`/`actual` pairing is not modelled.
 Known limits: a class body opened and closed on one line (`class A { fun f() {} }`)
 may lose or misplace members; an import alias is ignored (the import resolves by its
 original path); extension functions imported by name are not resolved; an import that
-matches more than one file gives no edge.
-Files in other languages are recorded as unparsed `File` nodes — the build never
-fails on an unknown language.
+matches more than one file gives no edge; Kotlin and Java files do not resolve imports
+to each other; imports of top-level `val`, `const` or `typealias` do not resolve.
+Files with other extensions are skipped (no node) — the build never fails on an
+unknown language.
 
 ## Artifacts read
 

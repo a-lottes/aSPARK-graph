@@ -19,7 +19,7 @@
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
 - **Summary:** Kotlin is a sixth registry-entry extractor (`code_kotlin.py`, pure, single-file) plus a `package.Name` symbol index in `build.py`; companion members flatten onto the class, extensions are top-level `Recv.name`, star imports never resolve. Already on the branch (5cc459a, 9bc4679) for T1–T5; T6–T12 close the gaps against the spec.
-- **Open:** `7 tasks not done` — see §3 Task Breakdown for which (T6–T12)
+- **Open:** `none` — all tasks T1–T12 `done` (see §3 Task Breakdown; deviations at the end)
 - **Binding ruling:** §3 Task Breakdown for current task status; a plan revision after review/QA findings updates §1/§3 in place, never a new section
 - **On conflict:** the numbered body below wins for everything except `Status`; log the mismatch as a finding at the next `/peer-review` and proceed — don't stop on it.
 

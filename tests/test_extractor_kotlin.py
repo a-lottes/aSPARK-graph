@@ -201,10 +201,15 @@ def test_kotlin_no_dangling_edges(tmp_path):
     _write_two_files(tmp_path)
     (tmp_path / "Src.kt").write_bytes(SOURCE)
     graph, _ = build_graph(tmp_path)
-    ids = {n["id"] for n in graph.nodes()}
+    # networkx add_edge silently creates a bare endpoint, so membership alone is
+    # tautological: a real (non-dangling) endpoint carries a `type` attribute.
+    typed = {n["id"] for n in graph.nodes() if "type" in n}
+    checked = 0
     for e in graph.edges():
         if e["type"] in ("contains", "imports"):
-            assert e["source"] in ids and e["target"] in ids
+            assert e["source"] in typed and e["target"] in typed, e
+            checked += 1
+    assert checked > 0
 
 
 def test_kotlin_empty_kt_file_shape(tmp_path):
@@ -218,3 +223,18 @@ def test_parse_cache_key_covers_kotlin_grammar():
     from aspark_graph.parse_cache import _version_tag
 
     assert "tree-sitter-kotlin=1.1.0" in _version_tag()
+
+
+def test_kotlin_nested_import_falls_back_to_owner_file(tmp_path):
+    (tmp_path / "Outer.kt").write_text("package p\n\nclass Outer {\n    class Inner\n}\n")
+    (tmp_path / "User.kt").write_text("package q\n\nimport p.Outer.Inner\n\nclass User\n")
+    graph, _ = build_graph(tmp_path)
+    edges = {(e["source"], e["target"], e["type"]) for e in graph.edges()}
+    assert (file_id("User.kt"), file_id("Outer.kt"), "imports") in edges
+
+
+def test_kotlin_extension_imported_by_name_makes_no_edge(tmp_path):  # README known limit
+    (tmp_path / "Ext.kt").write_text("package p\n\nfun String.shout() = this\n")
+    (tmp_path / "User.kt").write_text("package q\n\nimport p.shout\n\nclass User\n")
+    graph, _ = build_graph(tmp_path)
+    assert not [e for e in graph.edges() if e["type"] == "imports"]

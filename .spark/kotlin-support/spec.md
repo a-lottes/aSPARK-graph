@@ -60,7 +60,7 @@
 - [ ] AC-1.5: Given an `import a.b.C` directive whose path unambiguously matches one in-repo Kotlin file's declared package plus a declaration in it, when built, then an `imports` edge (`Confidence.EXTRACTED`) links the importing `File` to that file; an aliased import resolves by its original path.
 - [ ] AC-1.6: Given an import of an external or standard-library name, a star import, or a path matching more than one in-repo file, when built, then no `imports` edge is created for it, and the build does not error.
 - [ ] AC-1.7: Given `class A { fun f() {} }` with the body opened and closed on one line, when built, then the build succeeds without error; the missing or misplaced member is a documented known limit (README), not a defect.
-- [ ] AC-1.8: Given a repo containing Python, TS, JS, Java, Go, Rust and Kotlin files in one build, when built, then every file is language-tagged with its definitions and none is `unparsed`; a file with an unsupported extension (e.g. `.rb`) is still `unparsed: true`.
+- [ ] AC-1.8: Given a repo containing Python, TS, JS, Java, Go, Rust and Kotlin files in one build, when built, then every file is language-tagged with its definitions and none is `unparsed`; a file with an unsupported extension (e.g. `.rb`) is still skipped (no node; the build does not record unknown extensions).
 - [ ] AC-1.9: Given an unchanged repo with Kotlin files, when built twice, then `graph.json` is byte-identical; and given a repo with no Kotlin files, its `graph.json` is byte-identical to that built by the pre-change code.
 - [ ] AC-1.10: Given the README, when read, then "Supported languages" and the design guarantees list Kotlin, and the existing README language-count test still passes.
 
