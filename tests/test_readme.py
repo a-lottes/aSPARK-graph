@@ -115,3 +115,9 @@ def test_shallow_clone_warning_t15_no_blanket_graph_json_claim():
     flat = " ".join(README.split())
     assert "and `graph.json` stay the same" not in flat
     assert "never extra ones" in flat
+
+
+def test_kotlin_known_limits_stated():
+    normalized = " ".join(README.split())
+    assert "opened and closed on one line" in normalized
+    assert "import alias is ignored" in normalized

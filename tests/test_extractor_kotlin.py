@@ -1,5 +1,6 @@
 """Kotlin extractor + cross-file import resolution + multi-language build (issue #13)."""
 
+from aspark_graph import cli
 from aspark_graph.build import build_graph
 from aspark_graph.extractors import code_kotlin, get_extractor, language_for
 from aspark_graph.model import definition_id, file_id
@@ -153,3 +154,67 @@ def test_kotlin_build_is_deterministic(tmp_path):
     g1, _ = build_graph(tmp_path)
     g2, _ = build_graph(tmp_path)
     assert g1.to_dict() == g2.to_dict()
+
+
+def test_kotlin_aliased_import_resolves_by_original_path(tmp_path):
+    (tmp_path / "Helper.kt").write_text("package com.example.util\n\nclass Helper\n")
+    (tmp_path / "Widget.kt").write_text(
+        "package com.example.app\n\nimport com.example.util.Helper as H\n\nclass Widget\n"
+    )
+    graph, _ = build_graph(tmp_path)
+    edges = {(e["source"], e["target"], e["type"]) for e in graph.edges()}
+    assert (file_id("Widget.kt"), file_id("Helper.kt"), "imports") in edges
+
+
+def test_kotlin_ambiguous_import_makes_no_edge(tmp_path):
+    for d in ("a", "b"):
+        (tmp_path / d).mkdir()
+        (tmp_path / d / "Dup.kt").write_text("package p\n\nclass Dup\n")
+    (tmp_path / "User.kt").write_text("package q\n\nimport p.Dup\n\nclass User\n")
+    graph, _ = build_graph(tmp_path)
+    assert not [e for e in graph.edges() if e["type"] == "imports"]
+
+
+def test_kotlin_class_and_same_named_function_in_one_file_still_resolve(tmp_path):
+    (tmp_path / "Foo.kt").write_text("package p\n\nclass Foo\n\nfun Foo(x: Int) = Foo()\n")
+    (tmp_path / "User.kt").write_text("package q\n\nimport p.Foo\n\nclass User\n")
+    graph, _ = build_graph(tmp_path)
+    edges = {(e["source"], e["target"], e["type"]) for e in graph.edges()}
+    assert (file_id("User.kt"), file_id("Foo.kt"), "imports") in edges
+
+
+def test_kotlin_one_line_class_body_and_garbage_never_error(tmp_path, capsys):
+    (tmp_path / "One.kt").write_text("class A { fun f() {} }\n")
+    (tmp_path / "Junk.kt").write_bytes(b"}{ fun ((( \xff\xfe class\n")
+    graph, _ = build_graph(tmp_path)
+    for rel in ("One.kt", "Junk.kt"):
+        node = graph.get_node(file_id(rel))
+        assert node["language"] == "kotlin"
+        assert node.get("unparsed") is not True
+    rc = cli.main(["build", str(tmp_path)])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "Traceback" not in captured.err + captured.out
+
+
+def test_kotlin_no_dangling_edges(tmp_path):
+    _write_two_files(tmp_path)
+    (tmp_path / "Src.kt").write_bytes(SOURCE)
+    graph, _ = build_graph(tmp_path)
+    ids = {n["id"] for n in graph.nodes()}
+    for e in graph.edges():
+        if e["type"] in ("contains", "imports"):
+            assert e["source"] in ids and e["target"] in ids
+
+
+def test_kotlin_empty_kt_file_shape(tmp_path):
+    (tmp_path / "Empty.kt").write_text("")
+    graph, _ = build_graph(tmp_path)
+    assert graph.get_node(file_id("Empty.kt"))["language"] == "kotlin"
+    assert not [e for e in graph.edges() if e["source"] == file_id("Empty.kt")]
+
+
+def test_parse_cache_key_covers_kotlin_grammar():
+    from aspark_graph.parse_cache import _version_tag
+
+    assert "tree-sitter-kotlin=1.1.0" in _version_tag()

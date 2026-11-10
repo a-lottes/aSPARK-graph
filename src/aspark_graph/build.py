@@ -304,31 +304,34 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
     return index
 
 
-def _kotlin_symbol_index(extractions: list[FileExtraction]) -> dict[str, str]:
-    """Map ``package.Name`` -> relpath for top-level Kotlin classes and functions.
+def _kotlin_symbol_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
+    """Map ``package.Name`` -> sorted distinct relpaths declaring it (top level).
 
-    First writer wins (files are visited in sorted order). A name declared in
-    two files of one package is still indexed once; star imports never resolve.
+    More than one file declaring the same name in one package (e.g. Android
+    build variants) makes the import ambiguous; the resolver then emits no
+    edge rather than guessing. Star imports never resolve.
     """
-    index: dict[str, str] = {}
+    index: dict[str, set[str]] = {}
     for e in extractions:
         if e.language != "kotlin":
             continue
         prefix = f"{e.package}." if e.package else ""
         for d in e.definitions:
             if d.parent is None and "." not in d.qualname:
-                index.setdefault(f"{prefix}{d.qualname}", e.relpath)
-    return index
+                index.setdefault(f"{prefix}{d.qualname}", set()).add(e.relpath)
+    return {k: sorted(v) for k, v in index.items()}
 
 
-def _resolve_kotlin_import(module: str, index: dict[str, str]) -> str | None:
+def _resolve_kotlin_import(module: str, index: dict[str, list[str]]) -> str | None:
     if module.endswith(".*"):
         return None
-    if module in index:
-        return index[module]
-    # `import pkg.Outer.Inner` / `import pkg.Obj.member`: fall back to the owner.
-    owner, _, _ = module.rpartition(".")
-    return index.get(owner)
+    candidates = index.get(module)
+    if candidates is None:
+        # `import pkg.Outer.Inner` / `import pkg.Obj.member`: fall back to the owner.
+        candidates = index.get(module.rpartition(".")[0])
+    if candidates is not None and len(candidates) == 1:
+        return candidates[0]
+    return None
 
 
 def _go_package_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:

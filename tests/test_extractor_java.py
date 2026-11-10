@@ -54,6 +54,9 @@ def test_all_languages_in_one_build(tmp_path):  # AC-4.1 / go-rust-support AC-5.
     (tmp_path / "d.go").write_text("package main\n\nfunc D() int { return 1 }\n")
     (tmp_path / "e.rs").write_text("pub fn e() -> i32 { 1 }\n")
     (tmp_path / "f.kt").write_text("fun f() = 1\n")
+    (tmp_path / "g.js").write_text("export function gj() { return 1; }\n")
+    (tmp_path / "h.kts").write_text("fun h() = 1\n")
+    (tmp_path / "x.rb").write_text("def x; end\n")
     graph, _ = build_graph(tmp_path)
     langs = {n.get("language") for n in graph.nodes() if n["type"] == "File"}
     assert {"python", "typescript", "java", "go", "rust", "kotlin"} <= langs
@@ -63,8 +66,11 @@ def test_all_languages_in_one_build(tmp_path):  # AC-4.1 / go-rust-support AC-5.
     assert graph.has_node(definition_id("C.java", "C"))
     assert graph.has_node(definition_id("d.go", "D"))
     assert graph.has_node(definition_id("e.rs", "e"))
+    assert graph.has_node(definition_id("g.js", "gj"))
+    assert graph.has_node(definition_id("h.kts", "h"))
     unparsed = {n["id"] for n in graph.nodes() if n["type"] == "File" and n.get("unparsed")}
     assert unparsed == set()
+    assert graph.get_node(file_id("x.rb")) is None  # unknown language: skipped, no structure
 
 
 def test_ac_4_2_unsupported_language_becomes_unparsed_file_node(tmp_path, monkeypatch):
