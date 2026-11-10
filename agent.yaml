@@ -27,7 +27,7 @@ proposals:                # next-steps (the Leitstand asks the line for its next
 limits:
   sessions_per_day: 20
   poll_interval_seconds: 60
-  session_timeout_seconds: 3600    # a session that does not end by then fails the issue with that reason
+  session_timeout_seconds: 7200    # experiment E2: 2 h (default 3600); back to 3600 after E2
 
 tools:
   # These tools run without asking; all others (e.g. Bash) ask at the Leitstand.
