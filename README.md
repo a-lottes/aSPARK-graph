@@ -275,7 +275,7 @@ functions (extension and companion members included) become `Function` nodes, an
 `import` directives become best-effort in-repo `imports` edges (star imports are not
 resolved). Multiplatform `expect`/`actual` pairing is not modelled.
 Known limits: a class body opened and closed on one line (`class A { fun f() {} }`)
-may lose or misplace members; an import alias is ignored (the import resolves by its
+may lose or misplace members, and several in a row can hide the definitions after them; an import alias is ignored (the import resolves by its
 original path); extension functions imported by name are not resolved; an import that
 matches more than one file gives no edge; Kotlin and Java files do not resolve imports
 to each other; imports of top-level `val`, `const` or `typealias` do not resolve.

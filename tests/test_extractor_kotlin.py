@@ -238,3 +238,8 @@ def test_kotlin_extension_imported_by_name_makes_no_edge(tmp_path):  # README kn
     (tmp_path / "User.kt").write_text("package q\n\nimport p.shout\n\nclass User\n")
     graph, _ = build_graph(tmp_path)
     assert not [e for e in graph.edges() if e["type"] == "imports"]
+
+
+def test_kotlin_malformed_name_never_emits_nameless_class():
+    r = code_kotlin.extract("Bad.kt", b"class \xff\xfe Bad\n")
+    assert all(d.qualname.strip() for d in r.definitions)

@@ -89,6 +89,8 @@ def _add_type(node: Node, parent: str | None, result: FileExtraction) -> None:
     if name_node is None:
         return
     name = _text(name_node)
+    if not name.strip():
+        return  # malformed source: never emit a nameless node
     qualname = f"{parent}.{name}" if parent else name
     result.definitions.append(
         Definition(qualname=qualname, kind="Class", line=node.start_point[0] + 1, parent=parent,
