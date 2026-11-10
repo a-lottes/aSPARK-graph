@@ -237,6 +237,7 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
     """Best-effort File -> File ``imports`` edges (static; may be incomplete)."""
     py_index = _python_module_index(extractions)
     java_index = _java_type_index(extractions)
+    kotlin_index = _kotlin_symbol_index(extractions)
     go_index = _go_package_index(extractions)
     rust_index = _rust_module_index(extractions)
     rel_index = {e.relpath for e in extractions}
@@ -257,6 +258,8 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
                 target_rel = _resolve_ts_import(imp, e.relpath, rel_index)
             elif e.language == "java":
                 target_rel = java_index.get(imp.module)
+            elif e.language == "kotlin":
+                target_rel = _resolve_kotlin_import(imp, kotlin_index)
             elif e.language == "rust":
                 target_rel = _resolve_rust_import(imp, e.relpath, rust_index)
             # Only emit an edge when we resolve to a file that is in the graph.
@@ -299,6 +302,30 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
             if d.kind == "Class" and d.parent is None:
                 index.setdefault(f"{prefix}{d.qualname}", e.relpath)
     return index
+
+
+def _kotlin_symbol_index(extractions: list[FileExtraction]) -> dict[str, str]:
+    """Map ``package.Name`` -> relpath for top-level Kotlin classes and functions.
+
+    First writer wins (files are visited in sorted order) for determinism.
+    """
+    index: dict[str, str] = {}
+    for e in extractions:
+        if e.language != "kotlin":
+            continue
+        prefix = f"{e.package}." if e.package else ""
+        for d in e.definitions:
+            if d.parent is None:
+                index.setdefault(f"{prefix}{d.qualname}", e.relpath)
+    return index
+
+
+def _resolve_kotlin_import(imp, index: dict[str, str]) -> str | None:
+    """Exact match, else drop one trailing segment (nested class / member import)."""
+    if imp.module in index:
+        return index[imp.module]
+    head, _, _ = imp.module.rpartition(".")
+    return index.get(head)
 
 
 def _go_package_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
