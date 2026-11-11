@@ -236,7 +236,7 @@ aspark-graph query gate_health aspark-graph
 ```bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 319 tests; keep green
+uv run pytest                # 393 tests; keep green
 uv run pytest -m slow        # 4 slow tests: NFR-1 bench, MCP transport smoke, sdist manifest, unlocked fresh install
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .

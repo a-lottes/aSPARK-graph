@@ -54,7 +54,8 @@ def test_subtable_without_id_column_is_drift(tmp_path):
 def test_tables_outside_the_section_are_not_read(tmp_path):
     repo = _repo(tmp_path, HEAD + "| AC-1.1 | a | b | b | ✅ pass |\n")
     qa = repo / ".spark" / "demo" / "qa.md"
-    qa.write_text(qa.read_text() + "\n## 6. Other\n\n| Foo | Bar |\n|---|---|\n| 1 | 2 |\n")
+    # AC-shaped on purpose: if this table were read, AC-1.2 would turn verified.
+    qa.write_text(qa.read_text() + "\n## 6. Other\n\n| Spec ID | Result |\n|---|---|\n| AC-1.2 | ✅ pass |\n")
     graph, _ = build_graph(repo)
     assert queries.story_trace(graph, "US-1", feature="demo")["found"]
     assert graph.has_node(ac_id("demo", "AC-1.2"))
@@ -66,5 +67,19 @@ def test_single_table_unchanged_checks(tmp_path):
     g1, _ = build_graph(CURRENT_REPO)
     one = HEAD + "| AC-1.1 | call main | a value | a value | ✅ pass |\n| AC-1.2 | inspect run | uses helper | uses helper | ✅ pass |\n| AC-2.1 | trigger secondary | responds | responds | ✅ pass |\n| NFR-1 | build twice | identical output | identical output | ✅ pass |\n"
     g2, _ = build_graph(_repo(tmp_path, one))
-    q = lambda g: sorted(n for n in g.nodes() if str(n).startswith("qacheck"))
+    q = lambda g: sorted(n["id"] for n in g.nodes() if n["id"].startswith("qa:"))
     assert q(g1) == q(g2)
+
+
+def test_running_index_keeps_same_ac_in_two_tables_distinct(tmp_path):
+    """NFR-2: the same AC in row 0 of two tables gets two ids; the later result wins."""
+    two = (
+        "### a\n\n" + HEAD + "| AC-1.1 | a | b | b | ❌ fail |\n\n"
+        "### b\n\n" + HEAD + "| AC-1.1 | a | b | b | ✅ pass |\n"
+    )
+    graph, _ = build_graph(_repo(tmp_path, two))
+    checks = sorted(n["id"] for n in graph.nodes() if n["id"].startswith("qa:demo:AC-1.1#"))
+    assert len(checks) == 2
+    trace = queries.story_trace(graph, "US-1", feature="demo")
+    ac = next(a for a in trace["acceptance_criteria"] if a["ac"] == "AC-1.1")
+    assert ac["latest_result"] == "pass"
