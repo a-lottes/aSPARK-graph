@@ -25,6 +25,8 @@ _PARSER = Parser(_LANGUAGE)
 
 _CLASS_NODES = {"class_declaration", "object_declaration"}
 _BODY_NODES = {"class_body", "enum_class_body"}
+# Nodes never searched for declarations (their insides are bodies/expressions).
+_OPAQUE = {"function_body", "block", "property_declaration", "import", "package_header"}
 
 
 def extract(relpath: str, source: bytes) -> FileExtraction:
@@ -39,11 +41,26 @@ def _text(node: Node) -> str:
     return node.text.decode("utf-8", errors="replace")
 
 
+_DECL_TYPES = {"package_header", "import", "function_declaration", "property_declaration", "companion_object", "ERROR"} | _CLASS_NODES
+
+
 def _walk(node: Node, parent: str | None, result: FileExtraction, top: bool = False) -> None:
+    orphan: str | None = None  # a body-less class awaiting the members the grammar mis-parsed
     for child in node.named_children:
         t = child.type
+        if orphan is not None and t not in _DECL_TYPES and child.has_error:
+            # `class X @Ann internal constructor() : Y { ... }`: the grammar ends
+            # the class early and reads its body as an expression statement.
+            _walk_orphan(child, orphan, result)
+            orphan = None
+            continue
+        orphan = None
+        if t in _CLASS_NODES and not any(c.type in _BODY_NODES for c in child.named_children):
+            n = _name(child)
+            if n:
+                orphan = f"{parent}.{n}" if parent else n
         if t == "ERROR":
-            _walk(child, parent, result)
+            _walk_error(child, parent, result)
         elif t == "package_header":
             q = next((c for c in child.named_children if c.type == "qualified_identifier"), None)
             if q is not None:
@@ -60,6 +77,83 @@ def _walk(node: Node, parent: str | None, result: FileExtraction, top: bool = Fa
             _add_function(child, parent, result)
         elif t in _BODY_NODES and not top:
             _walk(child, parent, result)
+        elif child.has_error and t not in _OPAQUE:
+            # An unknown wrapper the grammar produced while recovering (e.g. an
+            # annotated class it could not parse): look inside it.
+            _walk(child, parent, result)
+
+
+def _walk_orphan(node: Node, parent: str, result: FileExtraction) -> None:
+    for c in node.named_children:
+        if c.type == "function_declaration":
+            _add_function(c, parent, result)
+        elif c.type in _CLASS_NODES:
+            _add_class(c, parent, result)
+        elif c.type not in _OPAQUE:
+            _walk_orphan(c, parent, result)
+
+
+def _walk_error(node: Node, parent: str | None, result: FileExtraction) -> None:
+    """Recover declarations from an ``ERROR`` node.
+
+    Where the grammar gives up on a class it often leaves the ``class`` keyword,
+    the name, ``{`` and the members flattened as siblings. Track ``class X {``
+    ... ``}`` with a small brace stack so members still nest under their class.
+    """
+    stack: list[tuple[str, int]] = []  # (qualname, brace depth at which it opened)
+    depth = 0
+    pending: str | None = None
+    kids = node.children
+    for i, c in enumerate(kids):
+        cur = stack[-1][0] if stack else parent
+        if not c.is_named:
+            if c.type in ("class", "interface", "object"):
+                nxt = kids[i + 1] if i + 1 < len(kids) else None
+                if nxt is not None and nxt.type == "identifier":
+                    name = _text(nxt)
+                    qual = f"{cur}.{name}" if cur else name
+                    result.definitions.append(
+                        Definition(qualname=qual, kind="Class", line=nxt.start_point[0] + 1, parent=cur, exported=True)
+                    )
+                    pending = qual
+            elif c.type == "{":
+                depth += 1
+                if pending is not None:
+                    stack.append((pending, depth))
+                    pending = None
+            elif c.type == "}":
+                if stack and stack[-1][1] == depth:
+                    stack.pop()
+                depth = max(0, depth - 1)
+            elif c.type == "fun":
+                nxt = kids[i + 1] if i + 1 < len(kids) else None
+                if nxt is not None and nxt.type == "identifier":
+                    name = _text(nxt)
+                    qual = f"{cur}.{name}" if cur else name
+                    result.definitions.append(
+                        Definition(qualname=qual, kind="Function", line=nxt.start_point[0] + 1, parent=cur, exported=True)
+                    )
+            continue
+        _walk_single(c, cur, result)
+
+
+def _walk_single(child: Node, parent: str | None, result: FileExtraction) -> None:
+    """Handle one node exactly as ``_walk`` handles each of its children."""
+    t = child.type
+    if t == "ERROR":
+        _walk_error(child, parent, result)
+    elif t in _CLASS_NODES:
+        _add_class(child, parent, result)
+    elif t == "function_declaration":
+        _add_function(child, parent, result)
+    elif t == "companion_object":
+        for body in child.named_children:
+            if body.type in _BODY_NODES:
+                _walk(body, parent, result)
+    elif t in _BODY_NODES:
+        _walk(child, parent, result)
+    elif child.has_error and t not in _OPAQUE:
+        _walk(child, parent, result)
 
 
 def _name(node: Node) -> str | None:

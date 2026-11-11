@@ -58,6 +58,7 @@ def test_all_languages_in_one_build(tmp_path):  # AC-4.1 / go-rust-support AC-5.
     langs = {n.get("language") for n in graph.nodes() if n["type"] == "File"}
     assert {"python", "typescript", "java", "go", "rust", "kotlin"} <= langs
     assert graph.has_node(definition_id("a.py", "f"))
+    assert graph.has_node(definition_id("f.kt", "k"))
     assert graph.has_node(definition_id("b.ts", "g"))
     assert graph.has_node(definition_id("C.java", "C"))
     assert graph.has_node(definition_id("d.go", "D"))

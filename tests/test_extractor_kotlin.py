@@ -120,3 +120,63 @@ def test_build_resolves_kotlin_imports(tmp_path):
     assert (main, file_id("src/tools/T.kt"), "imports") in edges
     # stdlib import resolves to nothing: only the two in-repo edges
     assert len([e for e in edges if e[0] == main and e[2] == "imports"]) == 2
+
+
+def _kt_import_edges(tmp_path, importer: str):
+    graph, _ = build_graph(tmp_path)
+    return {(e["source"], e["target"]) for e in graph.edges() if e["type"] == "imports" and e["source"] == file_id(importer)}
+
+
+def test_kotlin_ambiguous_fqn_gives_no_edge(tmp_path):  # plan T6
+    for variant in ("debug", "release"):
+        d = tmp_path / "src" / variant
+        d.mkdir(parents=True)
+        (d / "Config.kt").write_text("package com.x\n\nclass Config\n")
+    (tmp_path / "Main.kt").write_text("package com.app\n\nimport com.x.Config\n\nclass Main\n")
+    assert _kt_import_edges(tmp_path, "Main.kt") == set()
+
+
+def test_kotlin_same_file_overloads_still_resolve(tmp_path):  # plan T6
+    (tmp_path / "U.kt").write_text("package com.x\n\nfun f() {}\n\nfun f(a: Int) {}\n")
+    (tmp_path / "Main.kt").write_text("package com.app\n\nimport com.x.f\n\nclass Main\n")
+    assert _kt_import_edges(tmp_path, "Main.kt") == {(file_id("Main.kt"), file_id("U.kt"))}
+
+
+def test_kotlin_import_of_top_level_function(tmp_path):  # plan T7c
+    (tmp_path / "T.kt").write_text("package com.example.tools\n\nfun tool() {}\n")
+    (tmp_path / "Main.kt").write_text("package com.app\n\nimport com.example.tools.tool\n\nclass Main\n")
+    assert _kt_import_edges(tmp_path, "Main.kt") == {(file_id("Main.kt"), file_id("T.kt"))}
+
+
+def test_build_kotlin_script_and_contains_edges(tmp_path):  # plan T7a/b
+    (tmp_path / "build.gradle.kts").write_text("fun helper() {}\n")
+    (tmp_path / "App.kt").write_bytes(SOURCE)
+    graph, _ = build_graph(tmp_path)
+    files = {n["id"]: n for n in graph.nodes() if n["type"] == "File"}
+    assert files[file_id("build.gradle.kts")]["language"] == "kotlin"
+    assert not files[file_id("build.gradle.kts")].get("unparsed")
+    edges = {(e["source"], e["target"]) for e in graph.edges() if e["type"] == "contains"}
+    for q in ("Point", "Registry", "Shape", "Color", "top", "String.shout"):
+        assert (file_id("App.kt"), definition_id("App.kt", q)) in edges
+    assert (definition_id("App.kt", "Point"), definition_id("App.kt", "Point.norm")) in edges
+    assert (definition_id("App.kt", "Point"), definition_id("App.kt", "Point.origin")) in edges
+    assert (file_id("build.gradle.kts"), definition_id("build.gradle.kts", "helper")) in edges
+
+
+def test_kotlin_annotated_constructor_class_keeps_members():  # plan T11: grammar ends the class early
+    src = (
+        b"package a\n\n@Foo\nclass Ad\n  @RequiresApi(37)\n  internal constructor() : Base {\n"
+        b"  override fun matches(s: Int): Boolean = true\n  fun other() {}\n}\n"
+    )
+    d = _defs(code_kotlin.extract("Ad.kt", src))
+    assert ("Ad", "Class") in d
+    assert d[("Ad.matches", "Function")].parent == "Ad"
+    assert ("Ad.other", "Function") in d
+
+
+def test_kotlin_error_recovery_flattened_class_nests_members():  # plan T11
+    # Synthetic stand-in for an ERROR node holding `class X {` + members.
+    r = code_kotlin.extract("A.kt", b"class A { fun m() {}\n fun n() {} }\n")
+    d = _defs(r)
+    assert d[("A.m", "Function")].parent == "A"
+    assert d[("A.n", "Function")].parent == "A"

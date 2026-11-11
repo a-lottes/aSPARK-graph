@@ -6,7 +6,7 @@
 |---|---|
 | **Phase** | QA |
 | **Owner** | QA Tester (`/demo-day`) |
-| **Status** | `passed` |
+| **Status** | `in-review` |
 | **Date** | 2026-11-11 |
 
 ## 2. Acceptance Criteria Verification

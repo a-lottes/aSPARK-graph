@@ -6,7 +6,7 @@
 |---|---|
 | **Phase** | Review |
 | **Owner** | Reviewer (`/peer-review`) |
-| **Status** | `passed` |
+| **Status** | `in-review` |
 | **Date** | 2026-11-11 |
 
 ## 1. Findings

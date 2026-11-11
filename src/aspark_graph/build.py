@@ -307,10 +307,10 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
     return index
 
 
-def _kotlin_indexes(extractions: list[FileExtraction]) -> tuple[dict[str, str], dict[str, list[str]]]:
-    """Kotlin: fully-qualified symbol (class, or top-level fun) -> relpath, and
-    package -> its files. First writer wins (files are visited in sorted order)."""
-    symbols: dict[str, str] = {}
+def _kotlin_indexes(extractions: list[FileExtraction]) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Kotlin: fully-qualified symbol (class, or top-level fun) -> the sorted
+    distinct files declaring it, and package -> its files."""
+    symbols: dict[str, list[str]] = {}
     packages: dict[str, list[str]] = {}
     for e in extractions:
         if e.language != "kotlin":
@@ -320,17 +320,24 @@ def _kotlin_indexes(extractions: list[FileExtraction]) -> tuple[dict[str, str], 
             packages.setdefault(e.package, []).append(e.relpath)
         for d in e.definitions:
             if d.kind == "Class":
-                symbols.setdefault(f"{prefix}{d.qualname}", e.relpath)
+                fqn = f"{prefix}{d.qualname}"
             elif d.parent is None:
-                symbols.setdefault(f"{prefix}{d.qualname.rsplit('.', 1)[-1]}", e.relpath)
-    for files in packages.values():
+                fqn = f"{prefix}{d.qualname.rsplit('.', 1)[-1]}"
+            else:
+                continue
+            files = symbols.setdefault(fqn, [])
+            if e.relpath not in files:
+                files.append(e.relpath)
+    for files in list(symbols.values()) + list(packages.values()):
         files.sort()
     return symbols, packages
 
 
-def _resolve_kotlin_import(imp, symbols: dict[str, str], packages: dict[str, list[str]]) -> list[str]:
+def _resolve_kotlin_import(imp, symbols: dict[str, list[str]], packages: dict[str, list[str]]) -> list[str]:
     """Best-effort: exact symbol, else strip trailing segments (nested member /
-    ``Outer.CONST``); ``pkg.*`` fans out to the package's files. Stdlib and
+    ``Outer.CONST``); ``pkg.*`` fans out to the package's files. A symbol
+    declared in more than one file (e.g. Android debug/release variants) is
+    ambiguous and resolves to no edge rather than a guess. Stdlib and
     third-party imports match nothing and produce no edge."""
     module = imp.module
     if module.endswith(".*"):
@@ -341,7 +348,7 @@ def _resolve_kotlin_import(imp, symbols: dict[str, str], packages: dict[str, lis
     while parts:
         hit = symbols.get(".".join(parts))
         if hit:
-            return [hit]
+            return hit if len(hit) == 1 else []
         parts.pop()
     return []
 

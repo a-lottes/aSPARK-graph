@@ -272,7 +272,11 @@ ones. The exit code and the stdout format are unchanged, and on a full clone
 Code extraction covers **Python, TypeScript/JavaScript, Java, Go, Rust and Kotlin** (tree-sitter).
 Kotlin (`.kt`, `.kts`) yields `File`, `Class` (class, data class, object, interface,
 enum class) and `Function` (including extension functions and companion object
-members) nodes, plus best-effort in-repo `imports` edges.
+members) nodes, plus best-effort in-repo `imports` edges. The Kotlin grammar
+recovers poorly from some constructs (notably classes with annotated constructors
+and some multi-annotation headers); in the files it fails on, some definitions are
+missing rather than wrong. On a sweep of OkHttp (619 `.kt`/`.kts` files) 8 files
+parsed with errors.
 Files in other languages are recorded as unparsed `File` nodes — the build never
 fails on an unknown language.
 

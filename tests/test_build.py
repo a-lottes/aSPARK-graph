@@ -60,6 +60,7 @@ def test_double_build_multi_language_repo_is_deterministic(tmp_path):  # go-rust
     g1, _ = build_graph(tmp_path)
     g2, _ = build_graph(tmp_path)
     assert g1.to_dict() == g2.to_dict()
+    assert g1.save(tmp_path / "run1" / "graph.json").read_text() == g2.save(tmp_path / "run2" / "graph.json").read_text()
 
 
 def test_double_build_byte_identical_at_default_path(tmp_path):  # AC-1.2 via CLI path
