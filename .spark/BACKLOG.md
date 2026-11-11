@@ -255,6 +255,8 @@ bauen byte-identisch wie bisher.
 
 ### G7 · `mcp-drift-result` — Template-Drift über MCP als strukturiertes Ergebnis
 
+**Status: umgesetzt (Issue #40) — `server.build_graph` gibt `{"built": false, "reason": "template_drift", "file", "message"}` zurück.**
+
 **Priorität: Nach v0.7.1. Aufgenommen am 2026-09-25 (Review von `current-artifact-names`, F1 / Plan R4).**
 
 `server.build_graph` fängt nur `RepoRefused` (`server.py:25-28`). Eine fehlerhafte `qa.md`/`review.md`
