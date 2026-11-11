@@ -7,7 +7,7 @@
 | **Phase** | Review (hands-on) |
 | **Owner** | QA Tester (`/demo-day`, condensed, run by the orchestrator) |
 | **Input** | Branch `factory/issue-38`, `.spark/qa-multi-table/spec.md` |
-| **Status** | `passed` |
+| **Status** | `in-review` |
 | **Round** | 1 |
 | **Date** | 2026-11-11 |
 

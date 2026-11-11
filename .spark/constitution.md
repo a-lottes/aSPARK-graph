@@ -93,7 +93,7 @@
 - **Stack & entry points:** `inferred from pyproject.toml, src/aspark_graph/cli.py, src/aspark_graph/server.py`.
 - **Module structure:** `inferred from CLAUDE.md` — shared `queries.py` behind thin CLI and MCP adapters.
 - **Data model:** `inferred from src/aspark_graph/model.py, graph.py` — networkx graph persisted as canonical `.aspark-graph/graph.json` (gitignored, disposable) plus a parse-cache sidecar.
-- **Test practice:** `inferred from pyproject.toml, tests/` — pytest (319 default + 4 `slow`), run via `uv run pytest`.
+- **Test practice:** `inferred from pyproject.toml, tests/` — pytest (393 default + 4 `slow`), run via `uv run pytest`.
 - **Conventions:** `inferred from CLAUDE.md`; no `CONTRIBUTING.md` (`not found`).
 - **How to run:** `inferred from CLAUDE.md, README.md` — `uv sync --extra dev`, `uv run aspark-graph build .`, or `uvx aspark-graph serve`.
 - **Known pain points:** `inferred from .spark/BACKLOG.md` — git <2.15, monorepo subprojects and `--filter=tree:0` limits (G11); `__version__` stale at 0.1.0; no CI config found.
@@ -111,3 +111,4 @@
 | Date | Change | Why |
 |---|---|---|
 | 2026-11-09 | Initial constitution | Project kickoff |
+| 2026-11-11 | §9 pain points: removed the QA-first-table limit (G6, fixed by `qa-multi-table`); test count updated | Keep inferred facts true |

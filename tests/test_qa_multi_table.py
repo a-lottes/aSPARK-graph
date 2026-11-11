@@ -41,14 +41,16 @@ def test_every_subtable_is_read(tmp_path):
 
 def test_subtable_without_result_column_is_drift(tmp_path):
     bad = SPLIT + "\n### US-2\n\n| Spec ID | Notes |\n|---|---|\n| AC-2.1 | x |\n"
-    with pytest.raises(TemplateDriftError, match="Result"):
+    with pytest.raises(TemplateDriftError, match="Result") as exc:
         build_graph(_repo(tmp_path, bad))
+    assert exc.value.file.endswith(".spark/demo/qa.md")
 
 
 def test_subtable_without_id_column_is_drift(tmp_path):
     bad = SPLIT + "\n### US-2\n\n| Step | Result |\n|---|---|\n| x | ✅ pass |\n"
-    with pytest.raises(TemplateDriftError, match="AC"):
+    with pytest.raises(TemplateDriftError, match="AC") as exc:
         build_graph(_repo(tmp_path, bad))
+    assert exc.value.file.endswith(".spark/demo/qa.md")
 
 
 def test_tables_outside_the_section_are_not_read(tmp_path):
