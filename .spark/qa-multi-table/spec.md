@@ -43,7 +43,7 @@
 **Acceptance criteria:**
 
 - [ ] AC-1.1: Given a `qa.md` whose verification section holds two or more tables (for example one per `### US-n`), when the graph is built, then a QACheck exists for each AC row of every table, and `gate_health` counts an AC verified in a later table as verified.
-- [ ] AC-1.2: Given a `qa.md` with a single verification table, when the graph is built, then graph.json is byte-identical to the one built by the previous release.
+- [ ] AC-1.2: Given a `qa.md` whose verification section holds a single table and no other pipe block, when the graph is built, then graph.json is byte-identical to the one built by the previous release.
 - [ ] AC-1.3: Given tables in other sections of `qa.md`, when the graph is built, then they contribute no QACheck.
 
 ### US-2 (Must): Every table must be a QA table
@@ -84,6 +84,7 @@
 | C1 | 2026-11-11 | How are QACheck ids numbered across tables? | The row index runs on across tables (counting every row, as today), so a single table is unchanged. |
 | C2 | 2026-11-11 | A table in the section that is not a QA table (e.g. a legend)? | The issue says every table there must carry the columns; it is drift. |
 | C3 | 2026-11-11 | A pipe block without a separator row? | Not a table, skipped, as `_first_table` did. |
+| C4 | 2026-11-11 | (Plan revision) A non-table pipe block before the only QA table: old code recorded no checks, new code (C3) reads the table. | Accepted, a deliberate fix of the same silent under-count. AC-1.2 is narrowed to a section with one table and no other pipe block. No real Core `qa.md` hits this (34 files scanned in review). |
 
 ## 8. Design Review
 

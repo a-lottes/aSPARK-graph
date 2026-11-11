@@ -5,7 +5,7 @@
 | **Phase** | Review (hands-on) |
 | **Owner** | QA Tester (`/demo-day`) |
 | **Input** | Branch `factory/issue-44` at the commit after review round 1, `.spark/qa-multi-table/spec.md` (approved) |
-| **Status** | `passed` |
+| **Status** | `in-review` |
 | **Round** | 1 |
 | **Date** | 2026-11-11 |
 
