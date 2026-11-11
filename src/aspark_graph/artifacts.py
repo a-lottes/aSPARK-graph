@@ -361,15 +361,24 @@ def _section(lines: list[str], keyword: str) -> list[str] | None:
 
 
 def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
-    """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}."""
-    tables = _all_tables(block, unescape_pipes)
-    return tables[0] if tables else None
+    """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}.
+    Only the *first* pipe block is considered: if it is not a table (no separator
+    row), the result is None — a later block is never promoted (review/plan
+    parsing must not change, qa-multi-table plan §1)."""
+    groups = _pipe_groups(block, unescape_pipes)
+    return _as_table(groups[0]) if groups else None
 
 
 def _all_tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
     """Every markdown pipe-table in ``block``, in order, each as
     {header: [...], rows: [{col: val}]}. A pipe block without a separator row
     is not a table and is skipped."""
+    tables = (_as_table(rows) for rows in _pipe_groups(block, unescape_pipes))
+    return [t for t in tables if t is not None]
+
+
+def _pipe_groups(block: list[str], unescape_pipes: bool) -> list[list[list[str]]]:
+    """Consecutive ``|…|`` lines of ``block``, split into cells, one group per block."""
     groups: list[list[list[str]]] = []
     current: list[list[str]] | None = None
     for line in block:
@@ -381,20 +390,22 @@ def _all_tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
             current.append(_split_row(stripped, unescape_pipes))
         else:
             current = None  # table ended
-    tables = []
-    for rows in groups:
-        if len(rows) < 2:
-            continue
-        header = rows[0]
-        # rows[1] is the |---|---| separator
-        if not all(set(cell) <= set("-: ") for cell in rows[1]):
-            continue
-        data = []
-        for raw in rows[2:]:
-            cells = raw + [""] * (len(header) - len(raw))
-            data.append({header[i].lower(): cells[i] for i in range(len(header))})
-        tables.append({"header": header, "rows": data})
-    return tables
+    return groups
+
+
+def _as_table(rows: list[list[str]]) -> dict | None:
+    """A pipe block as {header, rows}, or None when it has no separator row."""
+    if len(rows) < 2:
+        return None
+    header = rows[0]
+    # rows[1] is the |---|---| separator
+    if not all(set(cell) <= set("-: ") for cell in rows[1]):
+        return None
+    data = []
+    for raw in rows[2:]:
+        cells = raw + [""] * (len(header) - len(raw))
+        data.append({header[i].lower(): cells[i] for i in range(len(header))})
+    return {"header": header, "rows": data}
 
 
 def _split_row(line: str, unescape_pipes: bool = False) -> list[str]:

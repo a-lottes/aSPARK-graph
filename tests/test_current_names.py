@@ -376,3 +376,24 @@ def test_g6_subtable_without_ac_column_is_drift(tmp_path):
     with pytest.raises(TemplateDriftError) as exc:
         build_graph(repo)
     assert "'AC' or 'Spec ID'" in exc.value.mismatch
+
+
+def test_g6_later_table_pass_counts_as_verified_and_ids_run_on(tmp_path):
+    # AC-1.1 via gate_health: a pass in the *second* table verifies its AC; the
+    # row index continues across tables (C1), so ids stay unique and ordered.
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(SPLIT_QA.replace("| AC-1.2 | call main | ❌ fail |", "| AC-1.2 | call main | ✅ pass |"))
+    graph, _ = build_graph(repo)
+    orders = {n["ac"]: n["order"] for n in graph.nodes() if n["type"] == "QACheck"}
+    assert orders == {"AC-1.1": 0, "AC-1.2": 1}
+    unverified = {a["id"] for a in queries.gate_health(graph, "demo")["unverified_acs"]}
+    assert ac_id("demo", "AC-1.2") not in unverified
+
+
+def test_g6_first_table_never_promotes_a_later_block():
+    # review/plan parsing is unchanged (plan §1): a non-table first pipe block
+    # still means "no table", exactly as before G6.
+    from aspark_graph.artifacts import _all_tables, _first_table
+    block = ["| note |", "", "| # | Status |", "|---|---|", "| F1 | open |"]
+    assert _first_table(block) is None
+    assert [t["header"] for t in _all_tables(block)] == [["#", "Status"]]
