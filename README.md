@@ -220,7 +220,11 @@ The same operations are exposed as MCP tools: `story_trace`, `impact`,
 `shortest_path` — all eight **read-only**, plus `build_graph`, the **one tool
 that writes** (`<target>/.aspark-graph/graph.json` and `parse-cache.json`).
 Querying before a build (or any domain error) returns a clean
-`{"found": false, ...}`-shaped result — never a raw traceback. See
+`{"found": false, ...}`-shaped result — never a raw traceback. The one
+exception is `build_graph` on `.spark/` template drift: it returns
+`{"built": false, "reason": "template_drift", "file": ..., "message": ...}`,
+writes no `graph.json` and leaves an existing one unchanged (the CLI prints one
+line and exits non-zero). See
 [`SECURITY.md`](https://github.com/a-lottes/aSPARK-graph/blob/main/SECURITY.md)
 for the full trust boundary.
 

@@ -25,3 +25,24 @@ def test_query_before_build_returns_clean_error(tmp_path):
         data = _call(tool, params)
         assert data["found"] is False
         assert "build" in data["error"].lower()
+
+
+def test_build_graph_template_drift_returns_structured_result(tmp_path):
+    repo = tmp_path / "r"
+    feat = repo / ".spark" / "demo"
+    feat.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    (feat / "qa.md").write_text("# QA\n\nno verification section\n")
+    gpath = repo / ".aspark-graph" / "graph.json"
+
+    data = server.build_graph(str(repo))
+    assert data["built"] is False
+    assert data["reason"] == "template_drift"
+    assert data["file"].endswith("qa.md")
+    assert "template drift" in data["message"]
+    assert not gpath.exists()
+
+    gpath.parent.mkdir()
+    gpath.write_text("old")
+    assert server.build_graph(str(repo))["built"] is False
+    assert gpath.read_text() == "old"
