@@ -1,7 +1,7 @@
 # agent.yaml for a project repo of the aSPARK Factory. All fields are optional.
 source: github            # the issues of the line's repo, on GitHub or GitLab; M6: jira
 mode: supervised          # manual, supervised, autonomous, dark. factoryctl new --mode overrides it
-base_branch: e2/base      # experiment E2: every run starts from the state before C# (dd4b994); back to main after E2
+base_branch: main         # empty: the repo's default branch
 spark_dir: .spark         # folder of the aSPARK feature trails
 aspark_plugin: image      # image: aSPARK from the runner image; checkout: repo is aSPARK itself; off
 
@@ -27,7 +27,7 @@ proposals:                # next-steps (the Leitstand asks the line for its next
 limits:
   sessions_per_day: 20
   poll_interval_seconds: 60
-  session_timeout_seconds: 7200    # experiment E2: 2 h (default 3600); back to 3600 after E2
+  session_timeout_seconds: 3600
 
 tools:
   # These tools run without asking; all others (e.g. Bash) ask at the Leitstand.
