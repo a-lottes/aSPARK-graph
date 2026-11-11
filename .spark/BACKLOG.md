@@ -255,7 +255,7 @@ bauen byte-identisch wie bisher.
 
 ### G7 · `mcp-drift-result` — Template-Drift über MCP als strukturiertes Ergebnis
 
-**Erledigt (Issue #42):** `server.build_graph` fängt `TemplateDriftError` und gibt `{"built": false, "reason": "template_drift", "file", "message"}` zurück; kein `graph.json` geschrieben/verändert; CLI unverändert.
+**Erledigt (Issue #42, Trail `.spark/mcp-drift-result/`, Version: wird bei `/go-live` gesetzt):** `server.build_graph` fängt `TemplateDriftError` und gibt `{"built": false, "reason": "template_drift", "file", "message"}` zurück; kein `graph.json` geschrieben/verändert; CLI unverändert.
 
 **Priorität: Nach v0.7.1. Aufgenommen am 2026-09-25 (Review von `current-artifact-names`, F1 / Plan R4).**
 

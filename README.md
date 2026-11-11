@@ -310,7 +310,10 @@ first — `❌` fail, `⚠` unverified, `✅` pass — and by its words only whe
 - **Fails loudly, never silently.** Template drift raises a named error; it never
   skips or guesses.
 - **Clean errors.** Domain errors (drift, graph-not-built) surface as one-line
-  messages with a non-zero exit / a structured dict — never a stack trace.
+  messages with a non-zero exit / a structured dict — never a stack trace. MCP
+  `build_graph` on drift returns `{"built": false, "reason": "template_drift",
+  "file": ..., "message": ...}`; the CLI prints the message on one line and exits
+  non-zero.
 - **Disposable.** The graph is a read model. Delete `.aspark-graph/` and rebuild;
   the source of truth is always the code and the `.spark/` files.
 

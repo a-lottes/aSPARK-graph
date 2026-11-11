@@ -45,6 +45,10 @@ on stderr and in the MCP `build_graph` booleans `shallow_history`/`no_git_histor
 grafted boundary commits contribute no inferred links, so truncated history only
 loses links; non-shallow graph.json byte-identical to v0.7.1; known limits: git
 < 2.15, monorepo subprojects, `--filter=tree:0` (BACKLOG G11)).
+`mcp-drift-result/` (issue #42, BACKLOG G7 — MCP `build_graph` returns template drift as
+`{"built": false, "reason": "template_drift", "file", "message"}` instead of raising; no `graph.json`
+written or changed on a failed build; CLI unchanged; the error carries `reason` like `RepoRefused`;
+version set at `/go-live`).
 v0.7.3 is a direct hotfix without a `.spark/` trail (user's call): caps `pydantic<2.14`,
 because pydantic 2.14 broke `serve` in every fresh install of 0.7.1/0.7.2 (found by the
 v0.7.2 post-release smoke check; see `.spark/shallow-clone-warning/release.md` §3).
@@ -236,7 +240,7 @@ aspark-graph query gate_health aspark-graph
 ```bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 319 tests; keep green
+uv run pytest                # 392 tests; keep green
 uv run pytest -m slow        # 4 slow tests: NFR-1 bench, MCP transport smoke, sdist manifest, unlocked fresh install
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .
