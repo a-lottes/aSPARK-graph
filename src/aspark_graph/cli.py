@@ -79,6 +79,10 @@ def _args_impact(qp: argparse.ArgumentParser) -> None:
     qp.add_argument("files", nargs="*", help="One or more changed file paths")
     qp.add_argument("--diff", default=None, metavar="RANGE",
                     help="A git range (e.g. HEAD~2..HEAD) to derive the files from")
+    qp.add_argument("--brief", action="store_true",
+                    help="Bounded answer: stories grouped by feature, no entity lists")
+    qp.add_argument("--feature", default=None,
+                    help="The feature being worked on; with --brief, other features come first")
 
 
 def _handle_impact(graph, args) -> dict:
@@ -86,10 +90,10 @@ def _handle_impact(graph, args) -> dict:
         if args.files:
             return {"found": False, "reason": "bad_args",
                     "message": "pass either files or --diff, not both"}
-        return queries.impact_diff(graph, args.repo, args.diff)
+        return queries.impact_diff(graph, args.repo, args.diff, brief=args.brief, feature=args.feature)
     if not args.files:
         return {"found": False, "reason": "bad_args", "message": "no files given (pass files or --diff)"}
-    return queries.impact(graph, args.files)
+    return queries.impact(graph, args.files, brief=args.brief, feature=args.feature)
 
 
 def _args_find_nodes(qp: argparse.ArgumentParser) -> None:

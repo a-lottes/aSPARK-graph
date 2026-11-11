@@ -165,6 +165,14 @@ each adapter. Never compute an answer in an adapter.
 - **Result cells are read marker-first (`❌` > `⚠` > `✅`), words second.** A marker
   is the author's explicit verdict; a word can sit inside a caveat. Consequence:
   `✅ pass (was ❌ fail)` reads fail (B4) — conservative, documented, not a bug.
+- **`impact` has a bounded form (`brief`, issue #46) — keep the full form byte-stable.**
+  Measured on real agent runs, the full answer was 63–98 KB and overflowed the tool
+  result, so it was mostly not read. `brief=True` regroups the same hits (one entry per
+  story, by feature, other features first when `feature` is given); it is computed in
+  `queries._brief_impact` from the full form's own aggregates, never a second walk.
+  Bounds are counts (`BRIEF_MAX_*`), so the cut is deterministic. An AC node names its
+  story by full id, a Story node by short name — `_short()` joins them; without it
+  every story appears twice.
 - **`aspark_graph.__version__` is stale (`0.1.0`) and pinned by `test_smoke.py`.**
   Nothing user-visible reads it (no `--version`; MCP `serverInfo` reports the
   `mcp` SDK's version, 1.19.0; the parse cache uses `importlib.metadata`). Read the version from
@@ -236,7 +244,7 @@ aspark-graph query gate_health aspark-graph
 ```bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 319 tests; keep green
+uv run pytest                # 403 tests; keep green
 uv run pytest -m slow        # 4 slow tests: NFR-1 bench, MCP transport smoke, sdist manifest, unlocked fresh install
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .

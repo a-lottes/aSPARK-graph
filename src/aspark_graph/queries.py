@@ -11,6 +11,7 @@ dict, so serialisation is identical across both adapters.
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 from . import confinement, git
@@ -158,13 +159,26 @@ def _reach(graph: Graph, seed: str) -> dict[str, int]:
     return best
 
 
-def impact(graph: Graph, files: list[str]) -> dict:
+# Bounds of the brief `impact` answer. An agent's tool result has a size limit; an
+# answer past it is dumped to a file and mostly not read. Counts, not bytes, so the
+# cut is deterministic and the totals say what was left out.
+BRIEF_MAX_STORIES = 30
+BRIEF_MAX_ACS = 20
+BRIEF_MAX_VIA = 5
+
+
+def impact(graph: Graph, files: list[str], brief: bool = False, feature: str | None = None) -> dict:
     """Blast radius of changing ``files``: affected stories and ACs, each tagged
-    with the weakest-edge confidence on its strongest path (AC-3.5)."""
+    with the weakest-edge confidence on its strongest path (AC-3.5).
+
+    ``brief`` returns the bounded form: stories grouped by feature with their ACs
+    and the files that reach them, no entity lists. ``feature`` names the feature
+    being worked on, so the stories of *other* features come first and apart."""
     per_file = []
     unknown = []
     agg_stories: dict[str, int] = {}
     agg_acs: dict[str, int] = {}
+    via: dict[str, list[str]] = {}
 
     for raw in files:
         rel = _normalise_path(raw)
@@ -181,9 +195,11 @@ def impact(graph: Graph, files: list[str]) -> dict:
             if ntype == NodeType.STORY.value:
                 stories[nid] = rank
                 agg_stories[nid] = max(agg_stories.get(nid, 0), rank)
+                via.setdefault(nid, []).append(rel)
             elif ntype == NodeType.ACCEPTANCE_CRITERION.value:
                 acs[nid] = rank
                 agg_acs[nid] = max(agg_acs.get(nid, 0), rank)
+                via.setdefault(nid, []).append(rel)
         code_entities = sorted(tgt for tgt, _ in graph.out_edges(fid, EdgeType.CONTAINS))
         entry = {
             "path": rel,
@@ -196,6 +212,8 @@ def impact(graph: Graph, files: list[str]) -> dict:
             entry["note"] = "no affected stories or acceptance criteria"
         per_file.append(entry)
 
+    if brief:
+        return _brief_impact(graph, per_file, unknown, agg_stories, agg_acs, via, feature)
     return {
         "found": True,
         "files": sorted(per_file, key=lambda f: f["path"]),
@@ -205,7 +223,104 @@ def impact(graph: Graph, files: list[str]) -> dict:
     }
 
 
-def impact_diff(graph: Graph, repo_root: str | Path, diff_range: str) -> dict:
+def _feature_of(node_id: str) -> str:
+    """The feature of a story or AC id (``story:<feature>:<name>``); features hold no colon."""
+    return node_id.split(":", 2)[1]
+
+
+def _brief_impact(
+    graph: Graph,
+    per_file: list[dict],
+    unknown: list[str],
+    agg_stories: dict[str, int],
+    agg_acs: dict[str, int],
+    via: dict[str, list[str]],
+    feature: str | None,
+) -> dict:
+    """The bounded `impact` answer: one entry per story, grouped by feature."""
+    name = feature.split(":", 1)[1] if feature and feature.startswith("feature:") else feature
+    # One entry per story. An AC whose story the files do not reach on their own still
+    # belongs under that story, at the AC's own confidence.
+    entries: dict[tuple[str, str], dict] = {}
+    for sid, rank in agg_stories.items():
+        node = graph.get_node(sid)
+        entries[(_feature_of(sid), _short(node.get("story")))] = {"rank": rank, "acs": {}, "via": set(via.get(sid, ()))}
+    for aid, rank in agg_acs.items():
+        node = graph.get_node(aid)
+        key = (_feature_of(aid), _short(node.get("story")))
+        entry = entries.setdefault(key, {"rank": rank, "acs": {}, "via": set()})
+        entry["acs"][node.get("ac")] = rank
+        entry["via"].update(via.get(aid, ()))
+
+    truncated = False
+    ordered = sorted(entries, key=lambda k: (name is not None and k[0] == name, k[0], _natural(k[1])))
+    if len(ordered) > BRIEF_MAX_STORIES:
+        ordered, truncated = ordered[:BRIEF_MAX_STORIES], True
+
+    groups: dict[str, list[dict]] = {}
+    for feat, story in ordered:
+        entry = entries[(feat, story)]
+        acs = sorted(entry["acs"], key=_natural)
+        paths = sorted(entry["via"])
+        item: dict = {"story": story, "confidence": _RANK_CONF[entry["rank"]]}
+        by_tier: dict[str, list[str]] = {}
+        for ac in acs[:BRIEF_MAX_ACS]:
+            by_tier.setdefault(_RANK_CONF[entry["acs"][ac]], []).append(ac)
+        item["acs"] = {tier: by_tier[tier] for tier in sorted(by_tier)}
+        item["via"] = paths[:BRIEF_MAX_VIA]
+        if len(acs) > BRIEF_MAX_ACS:
+            item["acs_total"], truncated = len(acs), True
+        if len(paths) > BRIEF_MAX_VIA:
+            item["via_total"], truncated = len(paths), True
+        groups.setdefault(feat, []).append(item)
+
+    def listed(feats: list[str]) -> list[dict]:
+        return [{"feature": feat, "stories": groups[feat]} for feat in sorted(feats)]
+
+    result: dict = {
+        "found": True,
+        "brief": True,
+        "files": [
+            {
+                "path": f["path"],
+                "in_graph": True,
+                "code_entities": len(f["code_entities"]),
+                "stories": len(f["affected_stories"]),
+                "acs": len(f["affected_acs"]),
+            }
+            for f in sorted(per_file, key=lambda f: f["path"])
+        ],
+        "unknown_files": sorted(unknown),
+    }
+    if name is None:
+        result["affected"] = listed(list(groups))
+    else:
+        result["feature"] = name
+        result["other_features"] = listed([feat for feat in groups if feat != name])
+        result["this_feature"] = groups.get(name, [])
+    result["totals"] = {
+        "features": len({feat for feat, _ in entries}),
+        "stories": len(entries),
+        "acs": len(agg_acs),
+    }
+    result["truncated"] = truncated
+    return result
+
+
+def _short(story: str | None) -> str:
+    """A story's short name. A Story node carries ``US-1``; an AC node names its story
+    by full id (``story:<feature>:US-1``). Both must land on one entry."""
+    return (story or "").rsplit(":", 1)[-1]
+
+
+def _natural(text: str | None) -> list:
+    """Sort key that orders US-2 before US-10 and AC-1.2 before AC-1.10."""
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", text or "")]
+
+
+def impact_diff(
+    graph: Graph, repo_root: str | Path, diff_range: str, brief: bool = False, feature: str | None = None
+) -> dict:
     """Blast radius of a git change range: resolve the range to a file list and
     feed the existing `impact` engine (so the answer equals passing the files
     explicitly — AC-3.1)."""
@@ -213,7 +328,7 @@ def impact_diff(graph: Graph, repo_root: str | Path, diff_range: str) -> dict:
     files, err = git.diff_files(repo_root, diff_range)
     if err is not None:
         return {"found": False, "reason": "bad_range", "range": diff_range, "message": err}
-    result = impact(graph, files)
+    result = impact(graph, files, brief=brief, feature=feature)
     result["range"] = diff_range
     if not files:
         result["note"] = "no files in range"
