@@ -1,10 +1,12 @@
 # QA: kotlin-support
 
+<!-- aspark-template: aspark/0.1.0 -->
+
 | | |
 |---|---|
-| **Phase** | QA Tester (/demo-day) |
-| **Owner** | passed |
-| **Status** | `` |
+| **Phase** | QA |
+| **Owner** | QA Tester (`/demo-day`) |
+| **Status** | `passed` |
 | **Date** | 2026-11-11 |
 
 ## 2. Acceptance Criteria Verification

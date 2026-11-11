@@ -1,9 +1,11 @@
 # Spec: kotlin-support
 
+<!-- aspark-template: aspark/0.1.0 -->
+
 | | |
 |---|---|
 | **Phase** | Specify |
-| **Owner** | Product Owner (/story-time) |
+| **Owner** | Product Owner (`/story-time`) |
 | **Status** | `approved` |
 | **Date** | 2026-11-11 |
 

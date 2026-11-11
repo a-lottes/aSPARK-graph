@@ -1,10 +1,12 @@
 # Review: kotlin-support
 
+<!-- aspark-template: aspark/0.1.0 -->
+
 | | |
 |---|---|
-| **Phase** | Reviewer (/peer-review) |
-| **Owner** | passed |
-| **Status** | `` |
+| **Phase** | Review |
+| **Owner** | Reviewer (`/peer-review`) |
+| **Status** | `passed` |
 | **Date** | 2026-11-11 |
 
 ## 1. Findings

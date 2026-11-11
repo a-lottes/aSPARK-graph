@@ -1,10 +1,12 @@
 # Plan: kotlin-support
 
+<!-- aspark-template: aspark/0.1.0 -->
+
 | | |
 |---|---|
-| **Phase** | Engineering Manager (/sprint-plan) |
-| **Owner** | approved |
-| **Status** | `` |
+| **Phase** | Plan |
+| **Owner** | Engineering Manager (`/sprint-plan`) |
+| **Status** | `approved` |
 | **Date** | 2026-11-11 |
 
 ## 1. Architecture Decision
