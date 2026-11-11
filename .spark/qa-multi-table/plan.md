@@ -63,4 +63,4 @@ Unit/integration tests build the `demo` fixture with a rewritten `qa.md`. Regres
 ## Increment record (for `/peer-review`)
 
 - Code: commit 6681ded (`artifacts.py`, tests, docs). 390 passed, slow tests not yet run.
-- Deviation: the code was written before this trail existed (process slip, corrected by writing spec and plan afterwards). T4 is still to be run in `/peer-review`.
+- Deviation: the code was written before this trail existed (process slip, corrected by writing spec and plan afterwards). T4 run: this repo (all trails, single-table qa files) built under `6681ded~1` (git worktree) and under the new code, both on a `.git`-marked copy of the tracked files: graph.json `cmp` identical (607251 bytes).
