@@ -56,7 +56,12 @@ _LOCATION_RE = re.compile(r"([\w./\-]+?\.[A-Za-z0-9]+)(?::(\d+))?")
 
 
 class TemplateDriftError(Exception):
-    """A ``.spark/`` artifact does not match the supported template (AC-1.3)."""
+    """A ``.spark/`` artifact does not match the supported template (AC-1.3).
+
+    ``reason`` is the stable machine-readable key the MCP adapter returns, like
+    :class:`confinement.RepoRefused`."""
+
+    reason = "template_drift"
 
     def __init__(self, file: str, mismatch: str) -> None:
         self.file = file

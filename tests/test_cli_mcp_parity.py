@@ -296,3 +296,44 @@ def test_history_notice_iff_mcp_key_on_every_fixture(tmp_path, capsys, monkeypat
     assert not (result["shallow_history"] and result["no_git_history"])
     assert set(result) == _V071_BUILD_KEYS | {"shallow_history", "no_git_history"}
     assert (a / ".aspark-graph" / "graph.json").read_bytes() == (b / ".aspark-graph" / "graph.json").read_bytes()
+
+
+# --- template drift: CLI one-line message ≡ MCP structured result (#42) -------
+
+@pytest.mark.parametrize("name,body", [
+    ("qa.md", "# QA\n\nno verification section\n"),
+    ("review.md", "# Review\n\n## 3. Findings\n\n| # | Note |\n|---|---|\n| F1 | x |\n"),
+])
+def test_build_template_drift_cli_mcp_parity(tmp_path, capsys, name, body):
+    repo = tmp_path / "r"
+    feat = repo / ".spark" / "demo"
+    feat.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    (feat / name).write_text(body)
+
+    mcp = server.build_graph(str(repo))
+    capsys.readouterr()
+    rc = cli.main(["build", str(repo)])
+    out = capsys.readouterr()
+
+    assert rc == 1
+    assert out.out == ""
+    assert out.err.strip() == mcp["message"]
+    assert len(out.err.strip().splitlines()) == 1
+    assert mcp["file"] in out.err
+    assert "Traceback" not in out.err
+    assert not (repo / ".aspark-graph" / "graph.json").exists()
+
+
+def test_cli_drift_leaves_existing_graph_unchanged(tmp_path, capsys):
+    repo = tmp_path / "r"
+    feat = repo / ".spark" / "demo"
+    feat.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    gpath = repo / ".aspark-graph" / "graph.json"
+    assert cli.main(["build", str(repo)]) == 0
+    before = gpath.read_bytes()
+    (feat / "qa.md").write_text("# QA\n\nno verification section\n")
+    assert cli.main(["build", str(repo)]) == 1
+    capsys.readouterr()
+    assert gpath.read_bytes() == before
