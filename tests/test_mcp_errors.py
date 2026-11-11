@@ -93,12 +93,21 @@ def test_successful_build_has_no_built_key_and_matches_cli(tmp_path):
     from aspark_graph import cli
 
     src = Path(__file__).parent / "fixtures" / "sample_repo"
-    a, b = tmp_path / "a", tmp_path / "b"
-    shutil.copytree(src, a)
-    shutil.copytree(src, b)
-    for d in (a, b):
+    from aspark_graph.build import build_graph
+
+    a, b, c = tmp_path / "a", tmp_path / "b", tmp_path / "c"
+    for d in (a, b, c):
+        shutil.copytree(src, d)
         (d / ".git").mkdir(exist_ok=True)
     data = server.build_graph(str(a))
     assert "built" not in data
+    assert set(data) == {
+        "code_entities", "artifact_entities", "inferred_edges", "unparsed",
+        "ignored_legacy_files", "graph_path", "shallow_history", "no_git_history",
+    }
+    _, report = build_graph(c)
+    assert (data["code_entities"], data["artifact_entities"], data["inferred_edges"], data["unparsed"],
+            data["ignored_legacy_files"]) == (report.code_entities, report.artifact_entities,
+                                              report.inferred_edges, report.unparsed, report.shadowed)
     assert cli.main(["build", str(b)]) == 0
     assert (a / ".aspark-graph" / "graph.json").read_bytes() == (b / ".aspark-graph" / "graph.json").read_bytes()

@@ -25,8 +25,8 @@
 
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
-- **Verdict:** Passed. All 7 Must ACs and NFR-2/4/5 verified live or by test. 2 Minor plan-conformance findings stay open (F1, F2). 2 Minors fixed by the reviewer (F3, F4).
-- **Open:** `2 open` — Blockers: none; Majors: none (Minors/Nits: see §3)
+- **Verdict:** Passed. All 7 Must ACs and NFR-2/4/5 verified live or by test. All 4 findings were Minor; the reviewer fixed all four (F1–F4), each confirmed by mutation check or graph rebuild.
+- **Open:** `none` — Blockers: none; Majors: none (Minors/Nits: see §3)
 - **Binding ruling:** §6 Verdict and the gate checklist below — the only binding location; there is no other round to point to
 - **On conflict:** the numbered body below wins for everything except `Status`; log the mismatch as a finding at the next `/peer-review` and proceed — don't stop on it.
 
@@ -47,8 +47,8 @@
 | T2 | ✅ | `tests/test_mcp_errors.py:30-50`: dict, no graph, sentinel unchanged. |
 | T3 | ✅ | `README.md:223-227`, `BACKLOG.md:258`. |
 | T4 | ✅ | `tests/test_mcp_errors.py:65-72`. The DoD's `"Findings" in message` assertion was missing; the reviewer added it (F3). |
-| T5 | ❌ | Test exists at `tests/test_mcp_errors.py:75-86`, but not in the declared `tests/test_cli_mcp_parity.py` (F1). The stderr-path and stdout-traceback asserts were missing; the reviewer added them (F3). |
-| T6 | ❌ | Wrong file (F1). The DoD's exact-key and BuildReport-value asserts are absent (F2). |
+| T5 | ✅ | `tests/test_mcp_errors.py:75-86`. The plan named another file, now corrected by the reviewer (F1). The stderr-path and stdout-traceback asserts were missing; the reviewer added them (F3). |
+| T6 | ✅ | `tests/test_mcp_errors.py:89-113`. The plan named another file (F1). The reviewer added the DoD's exact-key and BuildReport-value asserts (F2). |
 | T7 | ✅ | DoD evidence was not recorded before review. The reviewer produced it (§5 evidence E2). |
 | T8 | ✅ | Evidence E5 below. |
 
@@ -56,8 +56,8 @@
 
 | # | Severity | Location | Finding | Status |
 |---|---|---|---|---|
-| F1 | Minor | `.spark/mcp-drift-result/plan.md` §2 + T5/T6 `files:`; `tests/test_mcp_errors.py:75-106` | Plan deviation: the T5/T6 tests landed in `test_mcp_errors.py`, but the plan declares `tests/test_cli_mcp_parity.py`, which is unchanged. So `story_trace` links T5/T6 to the wrong file, and `impact` on `test_mcp_errors.py` does not reach US-2. That is a wrong map for the next reviewer. Fix: the EM changes the `files:` notes and §2 to `tests/test_mcp_errors.py`, or the developer moves the two tests. | open |
-| F2 | Minor | `tests/test_mcp_errors.py:89-106` | T6 DoD is not met as written. The test asserts only `"built" not in data` and graph bytes equal to the CLI. It does not assert `set(result) == _V071_BUILD_KEYS ∪ {shallow_history, no_git_history}`, and it does not compare the counts against `build.build_graph`'s `BuildReport`. The key set is guarded by `test_cli_mcp_parity.py:297`. Values are unguarded by any test (reviewer verified them live, E3). Fix: add the two assertions T6 specifies. | open |
+| F1 | Minor | `.spark/mcp-drift-result/plan.md` §2 + T5/T6 `files:`; `tests/test_mcp_errors.py:75-106` | Plan deviation: the T5/T6 tests landed in `test_mcp_errors.py`, but the plan declares `tests/test_cli_mcp_parity.py`, which is unchanged. So `story_trace` links T5/T6 to the wrong file, and `impact` on `test_mcp_errors.py` does not reach US-2. That is a wrong map for the next reviewer. Fixed: the reviewer changed plan §2 and the T5/T6 `files:` notes to `tests/test_mcp_errors.py`. The graph rebuild's `story_trace` US-2 now links T5 to that file. | fixed r1 |
+| F2 | Minor | `tests/test_mcp_errors.py:89-113` | T6 DoD is not met as written. The test asserts only `"built" not in data` and graph bytes equal to the CLI. It does not assert `set(result) == _V071_BUILD_KEYS ∪ {shallow_history, no_git_history}`, and it does not compare the counts against `build.build_graph`'s `BuildReport`. The key set is guarded by `test_cli_mcp_parity.py:297`. Values were unguarded by any test. Fixed: the reviewer added both assertions. Mutation check: with `inferred_edges + 1` injected in `server.py`, this test fails. | fixed r1 |
 | F3 | Minor | `tests/test_mcp_errors.py:71,77,82-85` | The T4/T5 DoD assertions were missing: `"Findings" in message`, drifted file name in CLI stderr, no `Traceback` in stdout. Added by the reviewer. Mutation check: with the `server.py` catch removed, 3 of 5 tests in the file fail. | fixed r1 |
 | F4 | Minor | `.spark/mcp-drift-result/plan.md` Handoff | Handoff said `Open: 5 tasks not done` while §3 had all 8 tasks `done` (stale block). Artifact wording, capped at Minor. Overwritten to `none`. | fixed r1 |
 
@@ -96,7 +96,7 @@ QA-equivalent evidence (headless tool). Base `dd4b994ab52007f5badc63efdc23c873c1
 
 ## 6. Verdict
 
-Anti-generosity standard applied (`/opt/aspark/standards/anti-generosity.md`). Every row above was decided by a live run, a test run or a `file:line` read; none rests on a graph answer. The change does what US-1 and US-2 demand. One `except` branch in the adapter returns the specified dict, the shared modules are untouched, and the ordering in `build.py` guarantees nothing is written on drift. I confirmed all of this live, including byte-identity against the pre-change code. No Blocker or Major is open, so the gate passes. Two Minors remain open and are real. F1: the T5/T6 tests live in a file other than the one the plan declares, so this feature's graph trail points at the wrong file. F2: the T6 test is weaker than its DoD, and no test pins the success-path values; only this review's live check covers them. Both should be closed in the next `/increment` touch or by an EM plan edit. I fixed F3 (missing T4/T5 assertions, confirmed by mutation) and F4 (stale plan Handoff) myself, and the suite is green after the fixes.
+Anti-generosity standard applied (`/opt/aspark/standards/anti-generosity.md`). Every row above was decided by a live run, a test run or a `file:line` read; none rests on a graph answer. The change does what US-1 and US-2 demand. One `except` branch in the adapter returns the specified dict, the shared modules are untouched, and the ordering in `build.py` guarantees nothing is written on drift. I confirmed all of this live, including byte-identity against the pre-change code. No Blocker or Major is open, so the gate passes. The increment fell short of its own plan in four places, all Minor, and I fixed all four. F1: the plan's `files:` notes named a test file that was never touched, which misdirected the graph trail. F2: the T6 test did not pin the success keys or values. F3: T4/T5 assertions were missing. F4: the plan Handoff was stale. Mutation checks confirm that the added assertions catch real breakage, and the suite is green after the fixes. One process note: T7/T8 were marked `done` while their evidence was due "in the review"; that evidence now exists only here (E2, E5). The harness committed an earlier draft of this report mid-review (`e5d07f1`). This final version and the F1/F2 fixes are uncommitted in the working tree.
 
 ---
 
@@ -108,7 +108,7 @@ re-review, edit this same checklist in place — never duplicate it as a second 
 - [x] No open Blocker findings
 - [x] No open Major findings (or explicitly waived by the user, with reason recorded here)
 - [x] Every Must AC traces to implementing code; no constitution non-negotiable violated
-- [x] All plan deviations documented and accepted (F1/F2 documented as open Minors; Minors do not block the gate)
+- [x] All plan deviations documented and accepted (F1/F2 deviations resolved: plan corrected and test brought up to its DoD; nothing left that needs acceptance)
 - [x] Test suite runs green
-- [x] Line budget respected: Ist ~95 / Soll ~150 (excluding HTML comments) — self-reported, no linter checks this; an overage is recorded here with a reason or explicitly waived by the user
+- [x] Line budget respected: Ist ~96 / Soll ~150 (excluding HTML comments) — self-reported, no linter checks this; an overage is recorded here with a reason or explicitly waived by the user
 - [x] Status set to `passed`
