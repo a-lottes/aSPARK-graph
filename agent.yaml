@@ -1,7 +1,7 @@
 # agent.yaml for a project repo of the aSPARK Factory. All fields are optional.
 source: github            # the issues of the line's repo, on GitHub or GitLab; M6: jira
 mode: supervised          # manual, supervised, autonomous, dark. factoryctl new --mode overrides it
-base_branch: main         # empty: the repo's default branch
+base_branch: main         # the branch every run starts from and its pull request targets
 spark_dir: .spark         # folder of the aSPARK feature trails
 aspark_plugin: image      # image: aSPARK from the runner image; checkout: repo is aSPARK itself; off
 
