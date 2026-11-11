@@ -281,33 +281,38 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    table = _first_table(section, unescape_pipes=True)
-    if table is None:
-        return 0
-    header = {k.lower() for k in table["header"]}
-    id_col = _qa_id_column(table["header"])
-    if id_col is None:
-        raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
-    if not any("result" in h for h in header):
-        raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
-
+    tables = _all_tables(section, unescape_pipes=True)
     added = 0
-    for index, row in enumerate(table["rows"]):
-        ac_cell = _col(row, id_col)
-        m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
-        if not m:
-            continue
-        ac = m.group(1)
-        result = _normalise_result(_col(row, "result"))
-        node_id = qacheck_id(feature, ac, index)
-        graph.add_node(
-            node_id, NodeType.QA_CHECK,
-            ac=ac, result=result, date=_col(row, "date"), feature=feature, order=index,
-        )
-        target = ac_id(feature, ac)
-        if graph.has_node(target):
-            graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
-        added += 1
+    index = 0  # continues across tables; a single table keeps today's ids
+    for n, table in enumerate(tables, start=1):
+        header = {k.lower() for k in table["header"]}
+        # With several tables the message says which one; a single table keeps its text.
+        where = ""
+        if len(tables) > 1:
+            where = f" (table {n} of {len(tables)}" + (f", under '{table['heading']}')" if table["heading"] else ")")
+        id_col = _qa_id_column(table["header"])
+        if id_col is None:
+            raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)}){where}")
+        if not any("result" in h for h in header):
+            raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)}){where}")
+        for row in table["rows"]:
+            row_index = index
+            index += 1
+            ac_cell = _col(row, id_col)
+            m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
+            if not m:
+                continue
+            ac = m.group(1)
+            result = _normalise_result(_col(row, "result"))
+            node_id = qacheck_id(feature, ac, row_index)
+            graph.add_node(
+                node_id, NodeType.QA_CHECK,
+                ac=ac, result=result, date=_col(row, "date"), feature=feature, order=row_index,
+            )
+            target = ac_id(feature, ac)
+            if graph.has_node(target):
+                graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
+            added += 1
     return added
 
 
@@ -360,22 +365,70 @@ def _section(lines: list[str], keyword: str) -> list[str] | None:
 
 
 def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
-    """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}."""
-    rows: list[list[str]] = []
-    in_table = False
+    """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}.
+    Only the *first* pipe block is considered: if it is not a table (no separator
+    row), the result is None — a later block is never promoted (review/plan
+    parsing must not change, qa-multi-table plan §1)."""
+    groups = _pipe_groups(block, unescape_pipes)
+    return _as_table(groups[0]) if groups else None
+
+
+def _all_tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
+    """Every markdown pipe-table in ``block``, in order, each as
+    {header: [...], rows: [{col: val}], heading: str | None}, ``heading`` being the
+    nearest preceding ``###``-or-deeper line. A pipe block without a separator
+    row is not a table and is skipped."""
+    out = []
+    for rows, heading in zip(_pipe_groups(block, unescape_pipes), _group_headings(block)):
+        table = _as_table(rows)
+        if table is not None:
+            table["heading"] = heading
+            out.append(table)
+    return out
+
+
+def _group_headings(block: list[str]) -> list[str | None]:
+    """The nearest preceding ``###``-or-deeper heading of each pipe block, in the
+    same order and grouping as ``_pipe_groups``."""
+    headings: list[str | None] = []
+    heading: str | None = None
+    in_group = False
     for line in block:
         stripped = line.strip()
         if stripped.startswith("|") and stripped.endswith("|"):
-            rows.append(_split_row(stripped, unescape_pipes))
-            in_table = True
-        elif in_table:
-            break  # table ended
+            if not in_group:
+                headings.append(heading)
+                in_group = True
+        else:
+            in_group = False
+            if re.match(r"^#{3,}\s", stripped):
+                heading = stripped
+    return headings
+
+
+def _pipe_groups(block: list[str], unescape_pipes: bool) -> list[list[list[str]]]:
+    """Consecutive ``|…|`` lines of ``block``, split into cells, one group per block."""
+    groups: list[list[list[str]]] = []
+    current: list[list[str]] | None = None
+    for line in block:
+        stripped = line.strip()
+        if stripped.startswith("|") and stripped.endswith("|"):
+            if current is None:
+                current = []
+                groups.append(current)
+            current.append(_split_row(stripped, unescape_pipes))
+        else:
+            current = None  # table ended
+    return groups
+
+
+def _as_table(rows: list[list[str]]) -> dict | None:
+    """A pipe block as {header, rows}, or None when it has no separator row."""
     if len(rows) < 2:
         return None
     header = rows[0]
     # rows[1] is the |---|---| separator
     if not all(set(cell) <= set("-: ") for cell in rows[1]):
-        # No separator row → not a real table shape
         return None
     data = []
     for raw in rows[2:]:

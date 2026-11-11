@@ -225,7 +225,8 @@ def test_qa_table_with_neither_ac_nor_spec_id_is_drift(tmp_path, name):
     with pytest.raises(TemplateDriftError) as exc:
         build_graph(repo)
     assert exc.value.file.endswith(name)
-    assert "'AC' or 'Spec ID'" in exc.value.mismatch
+    # qa-multi-table T5: a single-table message is unchanged character for character
+    assert exc.value.mismatch == "QA table missing an 'AC' or 'Spec ID' column (found ['id', 'result', 'steps performed'])"
 
 
 def test_spec_id_and_ac_headers_build_byte_identical_graphs(tmp_path):
@@ -337,3 +338,96 @@ def test_c14_default_split_still_separates_on_every_pipe():
     # scope guard: review/plan tables keep their current splitting (AC-5.1)
     assert _split_row("| a | b\\|c | d |") == ["a", "b\\", "c", "d"]
     assert _split_row("| a | b\\|c | d |", True) == ["a", "b|c", "d"]
+
+
+# --- G6: every table of the QA verification section is read ---
+
+SPLIT_QA = (
+    "# QA Report: demo\n\n| **Status** | `passed` |\n\n## 2. Acceptance Criteria Verification\n\n"
+    "### US-1\n\n| AC | Steps | Result |\n|---|---|---|\n| AC-1.1 | call main | ✅ pass |\n\n"
+    "### US-2\n\n| Spec ID | Steps | Result |\n|---|---|---|\n| AC-1.2 | call main | ❌ fail |\n\n"
+    "## 3. Other\n\n| Foo | Bar |\n|---|---|\n| AC-9.9 | ✅ pass |\n"
+)
+
+
+def test_g6_every_subtable_is_read_and_other_sections_are_not(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(SPLIT_QA)
+    graph, _ = build_graph(repo)
+    checks = {n["ac"]: n["result"] for n in graph.nodes() if n["type"] == "QACheck"}
+    assert checks == {"AC-1.1": "pass", "AC-1.2": "fail"}
+    unverified = {a["id"] for a in queries.gate_health(graph, "demo")["unverified_acs"]}
+    assert ac_id("demo", "AC-1.2") in unverified
+    assert ac_id("demo", "AC-1.1") not in unverified
+
+
+def test_g6_subtable_without_result_column_is_drift(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        SPLIT_QA.replace("| Spec ID | Steps | Result |", "| Spec ID | Steps | Outcome |"))
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert exc.value.file.endswith("qa.md") and "'Result'" in exc.value.mismatch
+    assert exc.value.mismatch.endswith("(table 2 of 2, under '### US-2')")
+
+
+def test_g6_subtable_without_ac_column_is_drift(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        SPLIT_QA.replace("| Spec ID | Steps | Result |", "| ID | Steps | Result |"))
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert "'AC' or 'Spec ID'" in exc.value.mismatch
+    assert exc.value.mismatch.endswith("(table 2 of 2, under '### US-2')")
+
+
+def test_g6_later_table_pass_counts_as_verified_and_ids_run_on(tmp_path):
+    # AC-1.1 via gate_health: a pass in the *second* table verifies its AC; the
+    # row index continues across tables (C1), so ids stay unique and ordered.
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(SPLIT_QA.replace("| AC-1.2 | call main | ❌ fail |", "| AC-1.2 | call main | ✅ pass |"))
+    graph, _ = build_graph(repo)
+    orders = {n["ac"]: n["order"] for n in graph.nodes() if n["type"] == "QACheck"}
+    assert orders == {"AC-1.1": 0, "AC-1.2": 1}
+    unverified = {a["id"] for a in queries.gate_health(graph, "demo")["unverified_acs"]}
+    assert ac_id("demo", "AC-1.2") not in unverified
+
+
+def test_g6_first_table_never_promotes_a_later_block():
+    # review/plan parsing is unchanged (plan §1): a non-table first pipe block
+    # still means "no table", exactly as before G6.
+    from aspark_graph.artifacts import _all_tables, _first_table
+    block = ["| note |", "", "| # | Status |", "|---|---|", "| F1 | open |"]
+    assert _first_table(block) is None
+    assert [t["header"] for t in _all_tables(block)] == [["#", "Status"]]
+    assert "heading" not in _first_table(block[2:])  # T5: the locator never leaks into review/plan
+
+
+def test_g6_single_table_drift_message_has_no_locator(tmp_path):
+    repo = _copy_repo(tmp_path)
+    qa = repo / ".spark" / "demo" / "qa.md"
+    qa.write_text(qa.read_text().replace("| Spec ID |", "| ID |", 1))
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert exc.value.mismatch.startswith("QA table missing an 'AC' or 'Spec ID' column (found [")
+    assert exc.value.mismatch.endswith("])")
+
+
+def test_g6_drift_without_heading_names_only_the_ordinal(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        SPLIT_QA.replace("### US-1\n\n", "").replace("### US-2\n\n", "").replace("| Spec ID | Steps | Result |", "| ID | Steps | Result |"))
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert exc.value.mismatch.endswith("]) (table 2 of 2)")
+
+
+def test_g6_non_table_pipe_block_before_the_qa_table_is_skipped(tmp_path):
+    """C3: differs from v0.7.3, which stopped at the first pipe block (plan §1)."""
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        "# QA Report: demo\n\n| **Status** | `passed` |\n\n## 2. Acceptance Criteria Verification\n\n"
+        "| a note |\n\n| AC | Steps | Result |\n|---|---|---|\n| AC-1.1 | call main | ✅ pass |\n")
+    graph, _ = build_graph(repo)
+    [check] = [n for n in graph.nodes() if n["type"] == "QACheck"]
+    assert (check["ac"], check["result"], check["order"]) == ("AC-1.1", "pass", 0)
