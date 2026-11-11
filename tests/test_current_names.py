@@ -337,3 +337,42 @@ def test_c14_default_split_still_separates_on_every_pipe():
     # scope guard: review/plan tables keep their current splitting (AC-5.1)
     assert _split_row("| a | b\\|c | d |") == ["a", "b\\", "c", "d"]
     assert _split_row("| a | b\\|c | d |", True) == ["a", "b|c", "d"]
+
+
+# --- G6: every table of the QA verification section is read ---
+
+SPLIT_QA = (
+    "# QA Report: demo\n\n| **Status** | `passed` |\n\n## 2. Acceptance Criteria Verification\n\n"
+    "### US-1\n\n| AC | Steps | Result |\n|---|---|---|\n| AC-1.1 | call main | ✅ pass |\n\n"
+    "### US-2\n\n| Spec ID | Steps | Result |\n|---|---|---|\n| AC-1.2 | call main | ❌ fail |\n\n"
+    "## 3. Other\n\n| Foo | Bar |\n|---|---|\n| AC-9.9 | ✅ pass |\n"
+)
+
+
+def test_g6_every_subtable_is_read_and_other_sections_are_not(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(SPLIT_QA)
+    graph, _ = build_graph(repo)
+    checks = {n["ac"]: n["result"] for n in graph.nodes() if n["type"] == "QACheck"}
+    assert checks == {"AC-1.1": "pass", "AC-1.2": "fail"}
+    unverified = {a["id"] for a in queries.gate_health(graph, "demo")["unverified_acs"]}
+    assert ac_id("demo", "AC-1.2") in unverified
+    assert ac_id("demo", "AC-1.1") not in unverified
+
+
+def test_g6_subtable_without_result_column_is_drift(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        SPLIT_QA.replace("| Spec ID | Steps | Result |", "| Spec ID | Steps | Outcome |"))
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert exc.value.file.endswith("qa.md") and "'Result'" in exc.value.mismatch
+
+
+def test_g6_subtable_without_ac_column_is_drift(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        SPLIT_QA.replace("| Spec ID | Steps | Result |", "| ID | Steps | Result |"))
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert "'AC' or 'Spec ID'" in exc.value.mismatch

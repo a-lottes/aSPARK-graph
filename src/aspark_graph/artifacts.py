@@ -281,33 +281,34 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    table = _first_table(section, unescape_pipes=True)
-    if table is None:
-        return 0
-    header = {k.lower() for k in table["header"]}
-    id_col = _qa_id_column(table["header"])
-    if id_col is None:
-        raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
-    if not any("result" in h for h in header):
-        raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
-
+    tables = _all_tables(section, unescape_pipes=True)
     added = 0
-    for index, row in enumerate(table["rows"]):
-        ac_cell = _col(row, id_col)
-        m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
-        if not m:
-            continue
-        ac = m.group(1)
-        result = _normalise_result(_col(row, "result"))
-        node_id = qacheck_id(feature, ac, index)
-        graph.add_node(
-            node_id, NodeType.QA_CHECK,
-            ac=ac, result=result, date=_col(row, "date"), feature=feature, order=index,
-        )
-        target = ac_id(feature, ac)
-        if graph.has_node(target):
-            graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
-        added += 1
+    index = 0  # continues across tables; a single table keeps today's ids
+    for table in tables:
+        header = {k.lower() for k in table["header"]}
+        id_col = _qa_id_column(table["header"])
+        if id_col is None:
+            raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
+        if not any("result" in h for h in header):
+            raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
+        for row in table["rows"]:
+            row_index = index
+            index += 1
+            ac_cell = _col(row, id_col)
+            m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
+            if not m:
+                continue
+            ac = m.group(1)
+            result = _normalise_result(_col(row, "result"))
+            node_id = qacheck_id(feature, ac, row_index)
+            graph.add_node(
+                node_id, NodeType.QA_CHECK,
+                ac=ac, result=result, date=_col(row, "date"), feature=feature, order=row_index,
+            )
+            target = ac_id(feature, ac)
+            if graph.has_node(target):
+                graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
+            added += 1
     return added
 
 
@@ -361,27 +362,39 @@ def _section(lines: list[str], keyword: str) -> list[str] | None:
 
 def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
     """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}."""
-    rows: list[list[str]] = []
-    in_table = False
+    tables = _all_tables(block, unescape_pipes)
+    return tables[0] if tables else None
+
+
+def _all_tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
+    """Every markdown pipe-table in ``block``, in order, each as
+    {header: [...], rows: [{col: val}]}. A pipe block without a separator row
+    is not a table and is skipped."""
+    groups: list[list[list[str]]] = []
+    current: list[list[str]] | None = None
     for line in block:
         stripped = line.strip()
         if stripped.startswith("|") and stripped.endswith("|"):
-            rows.append(_split_row(stripped, unescape_pipes))
-            in_table = True
-        elif in_table:
-            break  # table ended
-    if len(rows) < 2:
-        return None
-    header = rows[0]
-    # rows[1] is the |---|---| separator
-    if not all(set(cell) <= set("-: ") for cell in rows[1]):
-        # No separator row → not a real table shape
-        return None
-    data = []
-    for raw in rows[2:]:
-        cells = raw + [""] * (len(header) - len(raw))
-        data.append({header[i].lower(): cells[i] for i in range(len(header))})
-    return {"header": header, "rows": data}
+            if current is None:
+                current = []
+                groups.append(current)
+            current.append(_split_row(stripped, unescape_pipes))
+        else:
+            current = None  # table ended
+    tables = []
+    for rows in groups:
+        if len(rows) < 2:
+            continue
+        header = rows[0]
+        # rows[1] is the |---|---| separator
+        if not all(set(cell) <= set("-: ") for cell in rows[1]):
+            continue
+        data = []
+        for raw in rows[2:]:
+            cells = raw + [""] * (len(header) - len(raw))
+            data.append({header[i].lower(): cells[i] for i in range(len(header))})
+        tables.append({"header": header, "rows": data})
+    return tables
 
 
 def _split_row(line: str, unescape_pipes: bool = False) -> list[str]:

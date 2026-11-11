@@ -38,8 +38,9 @@ keeps the published sdist to exactly `src/`, `tests/`, `README.md`, `LICENSE`,
 `current-artifact-names/` (v0.7.1 — reads Core's current artifact names
 `review.md`/`qa.md`/`release.md` alongside the legacy `*-report.md`/`release-notes.md`;
 current name wins, the ignored legacy file is named on stderr / `ignored_legacy_files`;
-QA result cells read marker-first, an escaped `\|` keeps its columns; known limits:
-only the first QA verification table per `qa.md` is read (BACKLOG G6)),
+QA result cells read marker-first, an escaped `\|` keeps its columns; the first-table-only
+limit (G6) is lifted since: every table of the verification section, `### US-n` sub-tables
+included, is read, and each must carry an AC/`Spec ID` and a `Result` column or it is drift),
 `shallow-clone-warning/` (v0.7.2 — a shallow or git-less build names the condition
 on stderr and in the MCP `build_graph` booleans `shallow_history`/`no_git_history`;
 grafted boundary commits contribute no inferred links, so truncated history only
