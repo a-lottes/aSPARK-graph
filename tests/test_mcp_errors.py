@@ -48,3 +48,55 @@ def test_build_graph_template_drift_returns_structured_result(tmp_path):
     graph_file.write_text("sentinel")
     assert server.build_graph(str(tmp_path))["reason"] == "template_drift"
     assert graph_file.read_text() == "sentinel"
+
+
+def _drifted_repo(root, name, content):
+    (root / ".git").mkdir()
+    feat = root / ".spark" / "demo"
+    feat.mkdir(parents=True)
+    (feat / "spec.md").write_text(
+        "# Spec: demo\n\n## 4. User Stories\n\n### US-1 (Must): Run\n\n"
+        "**Acceptance criteria:**\n\n- [ ] AC-1.1: Given x, then y.\n"
+    )
+    (feat / name).write_text(content)
+    return feat / name
+
+
+def test_build_graph_review_drift_returns_structured_result(tmp_path):
+    bad = _drifted_repo(tmp_path, "review.md", "# Review\n\nno findings section\n")
+    data = server.build_graph(str(tmp_path))
+    assert data["built"] is False
+    assert data["reason"] == "template_drift"
+    assert data["file"].endswith("review.md")
+    assert not (tmp_path / ".aspark-graph" / "graph.json").exists()
+
+
+def test_cli_drift_is_one_line_nonzero_and_matches_mcp_message(tmp_path, capsys):
+    from aspark_graph import cli
+
+    _drifted_repo(tmp_path, "qa.md", "# QA\n\nnothing\n")
+    mcp = server.build_graph(str(tmp_path))
+    assert cli.main(["build", str(tmp_path)]) != 0
+    err = capsys.readouterr().err
+    assert err.strip() == mcp["message"]
+    assert "\n" not in err.strip()
+    assert "Traceback" not in err
+    assert not (tmp_path / ".aspark-graph" / "graph.json").exists()
+
+
+def test_successful_build_has_no_built_key_and_matches_cli(tmp_path):
+    import shutil
+    from pathlib import Path
+
+    from aspark_graph import cli
+
+    src = Path(__file__).parent / "fixtures" / "sample_repo"
+    a, b = tmp_path / "a", tmp_path / "b"
+    shutil.copytree(src, a)
+    shutil.copytree(src, b)
+    for d in (a, b):
+        (d / ".git").mkdir(exist_ok=True)
+    data = server.build_graph(str(a))
+    assert "built" not in data
+    assert cli.main(["build", str(b)]) == 0
+    assert (a / ".aspark-graph" / "graph.json").read_bytes() == (b / ".aspark-graph" / "graph.json").read_bytes()
