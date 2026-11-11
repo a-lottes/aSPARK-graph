@@ -45,20 +45,20 @@ _DECL_TYPES = {"package_header", "import", "function_declaration", "property_dec
 
 
 def _walk(node: Node, parent: str | None, result: FileExtraction, top: bool = False) -> None:
-    orphan: str | None = None  # a body-less class awaiting the members the grammar mis-parsed
+    suppress = False  # right after a body-less class: its members are unknowable
     for child in node.named_children:
         t = child.type
-        if orphan is not None and t not in _DECL_TYPES and child.has_error:
+        if suppress and (t == "ERROR" or (t not in _DECL_TYPES and child.has_error)):
             # `class X @Ann internal constructor() : Y { ... }`: the grammar ends
-            # the class early and reads its body as an expression statement.
-            _walk_orphan(child, orphan, result)
-            orphan = None
+            # the class early and reads its body as a stray ERROR/expression.
+            # Honest absence beats a member emitted with the wrong parent.
+            suppress = False
             continue
-        orphan = None
-        if t in _CLASS_NODES and not any(c.type in _BODY_NODES for c in child.named_children):
-            n = _name(child)
-            if n:
-                orphan = f"{parent}.{n}" if parent else n
+        suppress = t in _CLASS_NODES and not any(c.type in _BODY_NODES for c in child.named_children)
+        if t == "ERROR" and parent is None and not any(c.type in ("class", "interface", "object") for c in child.children):
+            # An ERROR at top level with no recovered `class X` may hold a class
+            # body whose header was lost; its `fun`s would look top-level. Skip.
+            continue
         if t == "ERROR":
             _walk_error(child, parent, result)
         elif t == "package_header":
@@ -81,16 +81,6 @@ def _walk(node: Node, parent: str | None, result: FileExtraction, top: bool = Fa
             # An unknown wrapper the grammar produced while recovering (e.g. an
             # annotated class it could not parse): look inside it.
             _walk(child, parent, result)
-
-
-def _walk_orphan(node: Node, parent: str, result: FileExtraction) -> None:
-    for c in node.named_children:
-        if c.type == "function_declaration":
-            _add_function(c, parent, result)
-        elif c.type in _CLASS_NODES:
-            _add_class(c, parent, result)
-        elif c.type not in _OPAQUE:
-            _walk_orphan(c, parent, result)
 
 
 def _walk_error(node: Node, parent: str | None, result: FileExtraction) -> None:

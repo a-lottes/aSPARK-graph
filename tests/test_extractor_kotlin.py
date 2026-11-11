@@ -118,6 +118,8 @@ def test_build_resolves_kotlin_imports(tmp_path):
     main = file_id("src/app/Main.kt")
     assert (main, file_id("src/util/Helper.kt"), "imports") in edges
     assert (main, file_id("src/tools/T.kt"), "imports") in edges
+    # AC-1.2: a plain `class` (the fifth kind) also gets its File -> Class contains edge
+    assert (main, definition_id("src/app/Main.kt", "Main"), "contains") in edges
     # stdlib import resolves to nothing: only the two in-repo edges
     assert len([e for e in edges if e[0] == main and e[2] == "imports"]) == 2
 
@@ -163,15 +165,24 @@ def test_build_kotlin_script_and_contains_edges(tmp_path):  # plan T7a/b
     assert (file_id("build.gradle.kts"), definition_id("build.gradle.kts", "helper")) in edges
 
 
-def test_kotlin_annotated_constructor_class_keeps_members():  # plan T11: grammar ends the class early
+def test_kotlin_annotated_constructor_class_members_absent_not_misplaced():  # review F1/F2
+    # The grammar ends this class early and reads its body as an expression.
+    # Honest absence: the class is found, no member is emitted with a wrong parent.
     src = (
         b"package a\n\n@Foo\nclass Ad\n  @RequiresApi(37)\n  internal constructor() : Base {\n"
         b"  override fun matches(s: Int): Boolean = true\n  fun other() {}\n}\n"
     )
     d = _defs(code_kotlin.extract("Ad.kt", src))
     assert ("Ad", "Class") in d
-    assert d[("Ad.matches", "Function")].parent == "Ad"
-    assert ("Ad.other", "Function") in d
+    assert not [q for q, k in d if k == "Function" and "." not in q]  # nothing top-level
+
+
+def test_kotlin_member_after_valid_class_not_attributed_to_it():  # review F2
+    src = (
+        b"data class P(val x: Int)\n\n@Ann(X::class)\n@B\nclass A {\n  fun m() {}\n  class N { fun n() {} }\n}\n"
+    )
+    d = _defs(code_kotlin.extract("P.kt", src))
+    assert not [q for q, _ in d if q.startswith("P.")]
 
 
 def test_kotlin_error_recovery_flattened_class_nests_members():  # plan T11

@@ -13,7 +13,7 @@
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
 - **Summary:** Kotlin is the sixth pure extractor (`extractors/code_kotlin.py`, tree-sitter-kotlin `==1.1.0`), modelled on Java/Go. Import resolution is in `build.py`. It refuses to link ambiguous FQNs instead of using first-writer-wins.
-- **Open:** `5 tasks not done` (T6, T7, T8, T10, T11). See §3 Task Breakdown.
+- **Open:** `0 tasks not done`. See §3 Task Breakdown.
 - **Binding ruling:** §3 Task Breakdown holds the current task status. A plan revision after review/QA findings updates §1/§3 in place, never a new section.
 - **On conflict:** the numbered body below wins for everything except `Status`. Log the mismatch as a finding at the next `/peer-review` and proceed. Don't stop on it.
 
@@ -103,3 +103,4 @@ System facts (stack, module layout, pin policy, test practice) come from `consti
 
 - **T8:** `git archive 64a081b^` of this repo (no `.kt`, no kotlin trail) built with `--full` under the old source (PYTHONPATH to a worktree at dd4b994) and under HEAD source: `graph.json` byte-identical, 597391 bytes each (`cmp` exit 0).
 - **T11:** scratch clone of `https://github.com/square/okhttp` @ `4162e9da32f636442bc789a7576144fe5972d0a5`: 575 `.kt` + 44 `.kts` = 619 files, 8 with a tree-sitter `ERROR` node. 17 files hand-compared (extractor functions/classes vs a regex over the source): the 11 error-free files matched exactly; the error files lost definitions (e.g. `Settings.kt` functions after a property getter, `Http2Stream.kt` nested classes, `Android17SocketAdapter.kt` entirely: the grammar reads an annotated class header as an expression). Two recovery rules were added (class keyword/name flattened inside `ERROR`; body-less class followed by a mis-parsed body) with tests; the remainder is a named known limit in the README. No wrong nesting was seen, only missing definitions.
+- **Review round 1 fix (F1/F2):** the ERROR-recovery "orphan" rule was removed and a top-level `ERROR` without a recovered `class X` is skipped, so a member the grammar cannot place is absent rather than wrongly nested. The earlier "no wrong nesting was seen" in T11 above was wrong (found by the review: okhttp `Http2Stream.kt`); superseded.
