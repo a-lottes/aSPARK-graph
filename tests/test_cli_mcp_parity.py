@@ -323,3 +323,17 @@ def test_build_template_drift_cli_mcp_parity(tmp_path, capsys, name, body):
     assert mcp["file"] in out.err
     assert "Traceback" not in out.err
     assert not (repo / ".aspark-graph" / "graph.json").exists()
+
+
+def test_cli_drift_leaves_existing_graph_unchanged(tmp_path, capsys):
+    repo = tmp_path / "r"
+    feat = repo / ".spark" / "demo"
+    feat.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    gpath = repo / ".aspark-graph" / "graph.json"
+    assert cli.main(["build", str(repo)]) == 0
+    before = gpath.read_bytes()
+    (feat / "qa.md").write_text("# QA\n\nno verification section\n")
+    assert cli.main(["build", str(repo)]) == 1
+    capsys.readouterr()
+    assert gpath.read_bytes() == before

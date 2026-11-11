@@ -7,7 +7,9 @@ Parity with the CLI's AC-5.2 behaviour (which prints a clean message and exits
 import shutil
 from pathlib import Path
 
-from aspark_graph import server
+import pytest
+
+from aspark_graph import artifacts, build, server
 
 SAMPLE_REPO = Path(__file__).parent / "fixtures" / "sample_repo"
 
@@ -33,10 +35,6 @@ def test_query_before_build_returns_clean_error(tmp_path):
 
 
 # --- template drift (issue #42 / BACKLOG G7) --------------------------------
-
-import pytest
-
-from aspark_graph import artifacts, build
 
 DRIFT_KEYS = {"built", "reason", "file", "message"}
 SUCCESS_KEYS = {
@@ -75,6 +73,9 @@ def test_build_graph_template_drift_returns_structured_result(tmp_path, name, bo
     assert data["reason"] == "template_drift"
     assert data["file"] == exc.file and data["file"].endswith(name)
     assert data["message"] == str(exc) and data["file"] in data["message"]
+    assert (
+        "Acceptance Criteria Verification" if name == "qa.md" else "findings table missing"
+    ) in data["message"]
     assert not gpath.exists()
 
     # A prior (real) graph stays byte-identical across a failed build.
