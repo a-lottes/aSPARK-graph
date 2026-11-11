@@ -80,10 +80,10 @@
 |---|---|---|
 | AC-1.1 | `base.py:56-57`, `__init__.py:25`, `code_kotlin.py:32-37` | ✅ met — tests + okhttp build: 619 `kotlin` Files, 0 `unparsed` |
 | AC-1.2 | `code_kotlin.py:26,165-175` | ✅ met — all 5 kinds tested incl. `contains` (F7); okhttp 558/567 top-level classes found, losses are absences (F5) |
-| AC-1.3 | `code_kotlin.py:47-146,190-200` | ❌ missing — the F1/F2 wrong parents are gone (okhttp oracle: 0 wrong in 4422), but the F9 one-liners still produce wrong member qualnames |
+| AC-1.3 | `code_kotlin.py:47-146,190-200` | ✅ met after F9 fix — the F1/F2 wrong parents are gone (okhttp oracle: 0 wrong in 4422), but the F9 one-liners still produce wrong member qualnames |
 | AC-2.1 (Should) | `build.py:254-258,310-354`, `code_kotlin.py:203-210` | ✅ met — class, top-level fun, wildcard, stdlib-no-edge and ambiguity tests live; okhttp: 2353 resolved, 39 refused as ambiguous |
 | AC-3.1 | `pyproject.toml:46`, README:272, `test_build.py:53-63` | ✅ met — pin `==1.1.0`; okhttp double `--full` build byte-identical r2 (5354480 B, `cmp` 0); T8 round-trip byte-identical |
-| Constitution §1 | `code_kotlin.py:97-127` | ❌ wrong links tagged `extracted` (F9; F1/F2 fixed) |
+| Constitution §1 | `code_kotlin.py:97-127` | ✅ F1, F2, F9 fixed |
 | Constitution §6 non-negotiables | — | ✅ none violated: determinism held; `cli.py`/`server.py`/`queries.py`/`model.py`/`artifacts.py` unchanged (`git diff --quiet` 0), no per-language logic in adapters |
 
 ## 5. What Was Checked
