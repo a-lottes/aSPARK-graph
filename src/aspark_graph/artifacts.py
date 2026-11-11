@@ -284,13 +284,17 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     tables = _all_tables(section, unescape_pipes=True)
     added = 0
     index = 0  # continues across tables; a single table keeps today's ids
-    for table in tables:
+    for n, table in enumerate(tables, start=1):
         header = {k.lower() for k in table["header"]}
+        # With several tables the message says which one; a single table keeps its text.
+        where = ""
+        if len(tables) > 1:
+            where = f" (table {n} of {len(tables)}" + (f", under '{table['heading']}')" if table["heading"] else ")")
         id_col = _qa_id_column(table["header"])
         if id_col is None:
-            raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
+            raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)}){where}")
         if not any("result" in h for h in header):
-            raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
+            raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)}){where}")
         for row in table["rows"]:
             row_index = index
             index += 1
@@ -371,10 +375,35 @@ def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
 
 def _all_tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
     """Every markdown pipe-table in ``block``, in order, each as
-    {header: [...], rows: [{col: val}]}. A pipe block without a separator row
-    is not a table and is skipped."""
-    tables = (_as_table(rows) for rows in _pipe_groups(block, unescape_pipes))
-    return [t for t in tables if t is not None]
+    {header: [...], rows: [{col: val}], heading: str | None}, ``heading`` being the
+    nearest preceding ``###``-or-deeper line. A pipe block without a separator
+    row is not a table and is skipped."""
+    out = []
+    for rows, heading in zip(_pipe_groups(block, unescape_pipes), _group_headings(block)):
+        table = _as_table(rows)
+        if table is not None:
+            table["heading"] = heading
+            out.append(table)
+    return out
+
+
+def _group_headings(block: list[str]) -> list[str | None]:
+    """The nearest preceding ``###``-or-deeper heading of each pipe block, in the
+    same order and grouping as ``_pipe_groups``."""
+    headings: list[str | None] = []
+    heading: str | None = None
+    in_group = False
+    for line in block:
+        stripped = line.strip()
+        if stripped.startswith("|") and stripped.endswith("|"):
+            if not in_group:
+                headings.append(heading)
+                in_group = True
+        else:
+            in_group = False
+            if re.match(r"^#{3,}\s", stripped):
+                heading = stripped
+    return headings
 
 
 def _pipe_groups(block: list[str], unescape_pipes: bool) -> list[list[list[str]]]:

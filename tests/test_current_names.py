@@ -367,6 +367,7 @@ def test_g6_subtable_without_result_column_is_drift(tmp_path):
     with pytest.raises(TemplateDriftError) as exc:
         build_graph(repo)
     assert exc.value.file.endswith("qa.md") and "'Result'" in exc.value.mismatch
+    assert exc.value.mismatch.endswith("(table 2 of 2, under '### US-2')")
 
 
 def test_g6_subtable_without_ac_column_is_drift(tmp_path):
@@ -376,6 +377,7 @@ def test_g6_subtable_without_ac_column_is_drift(tmp_path):
     with pytest.raises(TemplateDriftError) as exc:
         build_graph(repo)
     assert "'AC' or 'Spec ID'" in exc.value.mismatch
+    assert exc.value.mismatch.endswith("(table 2 of 2, under '### US-2')")
 
 
 def test_g6_later_table_pass_counts_as_verified_and_ids_run_on(tmp_path):
@@ -397,3 +399,33 @@ def test_g6_first_table_never_promotes_a_later_block():
     block = ["| note |", "", "| # | Status |", "|---|---|", "| F1 | open |"]
     assert _first_table(block) is None
     assert [t["header"] for t in _all_tables(block)] == [["#", "Status"]]
+
+
+def test_g6_single_table_drift_message_has_no_locator(tmp_path):
+    repo = _copy_repo(tmp_path)
+    qa = repo / ".spark" / "demo" / "qa.md"
+    qa.write_text(qa.read_text().replace("| Spec ID |", "| ID |", 1))
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert exc.value.mismatch.startswith("QA table missing an 'AC' or 'Spec ID' column (found [")
+    assert exc.value.mismatch.endswith("])")
+
+
+def test_g6_drift_without_heading_names_only_the_ordinal(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        SPLIT_QA.replace("### US-1\n\n", "").replace("### US-2\n\n", "").replace("| Spec ID | Steps | Result |", "| ID | Steps | Result |"))
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert exc.value.mismatch.endswith("]) (table 2 of 2)")
+
+
+def test_g6_non_table_pipe_block_before_the_qa_table_is_skipped(tmp_path):
+    """C3: differs from v0.7.3, which stopped at the first pipe block (plan §1)."""
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        "# QA Report: demo\n\n| **Status** | `passed` |\n\n## 2. Acceptance Criteria Verification\n\n"
+        "| a note |\n\n| AC | Steps | Result |\n|---|---|---|\n| AC-1.1 | call main | ✅ pass |\n")
+    graph, _ = build_graph(repo)
+    [check] = [n for n in graph.nodes() if n["type"] == "QACheck"]
+    assert (check["ac"], check["result"], check["order"]) == ("AC-1.1", "pass", 0)
