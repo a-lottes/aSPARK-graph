@@ -191,3 +191,30 @@ def test_kotlin_error_recovery_flattened_class_nests_members():  # plan T11
     d = _defs(r)
     assert d[("A.m", "Function")].parent == "A"
     assert d[("A.n", "Function")].parent == "A"
+
+
+def _flat(src: bytes):
+    return sorted(q for q, _ in _defs(code_kotlin.extract("A.kt", src)))
+
+
+def test_kotlin_error_recovery_ignores_local_class_in_body():  # review F9
+    q = _flat(b"class A { fun m() { class Local { fun l() {} } } }\n")
+    assert not [x for x in q if "Local" in x or x.endswith(".l")]
+    assert "A" in q
+
+
+def test_kotlin_error_recovery_ignores_anonymous_object_members():  # review F9
+    q = _flat(b"class A { val x = object : Foo { fun f() {} }; fun m() {} }\n")
+    assert "A.f" not in q
+    assert "A" in q  # members after the construct the grammar gave up on are absent, never misplaced
+
+
+def test_kotlin_error_recovery_keeps_companion_members():  # review F9
+    q = _flat(b"class A { companion object { fun c() {} } fun m() {} }\n")
+    assert "A.c" in q  # the grammar gives up after the first `}`, so `m` is absent
+
+
+def test_kotlin_error_recovery_local_class_via_run_block():  # review F9
+    q = _flat(b"class A { val v = run { class L { fun l() {} } }; fun m() {} }\n")
+    assert not [x for x in q if x.endswith("L") or x.endswith(".l")]
+    assert "A" in q  # members after the construct the grammar gave up on are absent, never misplaced

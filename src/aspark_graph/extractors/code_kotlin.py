@@ -96,10 +96,15 @@ def _walk_error(node: Node, parent: str | None, result: FileExtraction) -> None:
     kids = node.children
     for i, c in enumerate(kids):
         cur = stack[-1][0] if stack else parent
+        direct = depth == (stack[-1][1] if stack else 0)  # directly in the class body
         if not c.is_named:
             if c.type in ("class", "interface", "object"):
                 nxt = kids[i + 1] if i + 1 < len(kids) else None
-                if nxt is not None and nxt.type == "identifier":
+                if not direct:
+                    pass  # local class / anonymous object: not a member
+                elif c.type == "object" and nxt is not None and nxt.type == "{":
+                    pending = cur  # `companion object {`: members belong to the class
+                elif nxt is not None and nxt.type == "identifier":
                     name = _text(nxt)
                     qual = f"{cur}.{name}" if cur else name
                     result.definitions.append(
@@ -115,7 +120,7 @@ def _walk_error(node: Node, parent: str | None, result: FileExtraction) -> None:
                 if stack and stack[-1][1] == depth:
                     stack.pop()
                 depth = max(0, depth - 1)
-            elif c.type == "fun":
+            elif c.type == "fun" and direct:
                 nxt = kids[i + 1] if i + 1 < len(kids) else None
                 if nxt is not None and nxt.type == "identifier":
                     name = _text(nxt)
@@ -124,7 +129,8 @@ def _walk_error(node: Node, parent: str | None, result: FileExtraction) -> None:
                         Definition(qualname=qual, kind="Function", line=nxt.start_point[0] + 1, parent=cur, exported=True)
                     )
             continue
-        _walk_single(c, cur, result)
+        if direct:
+            _walk_single(c, cur, result)
 
 
 def _walk_single(child: Node, parent: str | None, result: FileExtraction) -> None:
