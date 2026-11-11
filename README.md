@@ -276,7 +276,7 @@ members) nodes, plus best-effort in-repo `imports` edges. The Kotlin grammar
 recovers poorly from some constructs (notably classes with annotated constructors
 and multi-annotation headers with arguments); where it does, the build emits **no**
 member rather than one with a wrong parent, so definitions are missing, never
-misplaced — and a following class can be lost too, even in a file that parses
+misplaced (for instance, a `}` closing both a companion object and its class on one line makes the grammar drop the declarations after it) — and a following class can be lost too, even in a file that parses
 without an error node. Top-level `val`/`const val` are not indexed, so imports of
 them (and of classes the grammar lost) produce no `imports` edge. On a sweep of
 OkHttp (619 `.kt`/`.kts` files) 8 files parsed with errors.
