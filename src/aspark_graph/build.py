@@ -239,6 +239,7 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
     java_index = _java_type_index(extractions)
     go_index = _go_package_index(extractions)
     rust_index = _rust_module_index(extractions)
+    kt_symbols, kt_packages = _kotlin_indexes(extractions)
     rel_index = {e.relpath for e in extractions}
     for e in extractions:
         src = file_id(e.relpath)
@@ -247,6 +248,11 @@ def _resolve_imports(graph: Graph, extractions: list[FileExtraction]) -> None:
                 # A Go import addresses a package (a directory), not a single
                 # file, so an unambiguous match can fan out to several files.
                 for target_rel in _resolve_go_import(imp, e.relpath, go_index):
+                    if target_rel in rel_index and target_rel != e.relpath:
+                        graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
+                continue
+            if e.language == "kotlin":
+                for target_rel in _resolve_kotlin_import(imp, kt_symbols, kt_packages):
                     if target_rel in rel_index and target_rel != e.relpath:
                         graph.add_edge(src, file_id(target_rel), EdgeType.IMPORTS, Confidence.EXTRACTED)
                 continue
@@ -299,6 +305,45 @@ def _java_type_index(extractions: list[FileExtraction]) -> dict[str, str]:
             if d.kind == "Class" and d.parent is None:
                 index.setdefault(f"{prefix}{d.qualname}", e.relpath)
     return index
+
+
+def _kotlin_indexes(extractions: list[FileExtraction]) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """Kotlin: fully-qualified symbol (class, or top-level fun) -> relpath, and
+    package -> its files. First writer wins (files are visited in sorted order)."""
+    symbols: dict[str, str] = {}
+    packages: dict[str, list[str]] = {}
+    for e in extractions:
+        if e.language != "kotlin":
+            continue
+        prefix = f"{e.package}." if e.package else ""
+        if e.package:
+            packages.setdefault(e.package, []).append(e.relpath)
+        for d in e.definitions:
+            if d.kind == "Class":
+                symbols.setdefault(f"{prefix}{d.qualname}", e.relpath)
+            elif d.parent is None:
+                symbols.setdefault(f"{prefix}{d.qualname.rsplit('.', 1)[-1]}", e.relpath)
+    for files in packages.values():
+        files.sort()
+    return symbols, packages
+
+
+def _resolve_kotlin_import(imp, symbols: dict[str, str], packages: dict[str, list[str]]) -> list[str]:
+    """Best-effort: exact symbol, else strip trailing segments (nested member /
+    ``Outer.CONST``); ``pkg.*`` fans out to the package's files. Stdlib and
+    third-party imports match nothing and produce no edge."""
+    module = imp.module
+    if module.endswith(".*"):
+        module = module[:-2]
+        if module in packages:
+            return list(packages[module])
+    parts = module.split(".")
+    while parts:
+        hit = symbols.get(".".join(parts))
+        if hit:
+            return [hit]
+        parts.pop()
+    return []
 
 
 def _go_package_index(extractions: list[FileExtraction]) -> dict[str, list[str]]:
