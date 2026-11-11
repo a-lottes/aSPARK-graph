@@ -225,7 +225,8 @@ def test_qa_table_with_neither_ac_nor_spec_id_is_drift(tmp_path, name):
     with pytest.raises(TemplateDriftError) as exc:
         build_graph(repo)
     assert exc.value.file.endswith(name)
-    assert "'AC' or 'Spec ID'" in exc.value.mismatch
+    # qa-multi-table T5: a single-table message is unchanged character for character
+    assert exc.value.mismatch == "QA table missing an 'AC' or 'Spec ID' column (found ['id', 'result', 'steps performed'])"
 
 
 def test_spec_id_and_ac_headers_build_byte_identical_graphs(tmp_path):
@@ -399,6 +400,7 @@ def test_g6_first_table_never_promotes_a_later_block():
     block = ["| note |", "", "| # | Status |", "|---|---|", "| F1 | open |"]
     assert _first_table(block) is None
     assert [t["header"] for t in _all_tables(block)] == [["#", "Status"]]
+    assert "heading" not in _first_table(block[2:])  # T5: the locator never leaks into review/plan
 
 
 def test_g6_single_table_drift_message_has_no_locator(tmp_path):

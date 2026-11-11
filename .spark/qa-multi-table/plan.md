@@ -13,7 +13,7 @@
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
 - **Summary:** `_parse_qa` loops over `_all_tables(section)`. Each table's header is validated on its own, and one row index runs across all tables. `_first_table` keeps its exact pre-G6 "first pipe block only" semantics through the shared `_pipe_groups`/`_as_table` split. The only change is in `artifacts.py`. This revision adds the sub-table locator to the drift message (review F3 / QA B1), a C3 guard test and a re-verification pass.
-- **Open:** `3 tasks not done` (T5, T6, T7). See §3 Task Breakdown.
+- **Open:** `none`. T1–T7 are `done`. See §3 Task Breakdown.
 - **Binding ruling:** §3 Task Breakdown for current task status. A plan revision after review/QA findings updates §1/§3 in place, never a new section.
 - **On conflict:** the numbered body below wins for everything except `Status`. Log the mismatch as a finding at the next `/peer-review` and proceed. Don't stop on it.
 
