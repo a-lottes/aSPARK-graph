@@ -5,7 +5,7 @@ Guidance for AI agents working in this repo. Part of the aSPARK product family.
 ## What this is
 
 A lean, local **code-and-artifact knowledge graph** served over MCP + a CLI. It
-links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust) with its `.spark/`
+links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust, Kotlin) with its `.spark/`
 delivery artifacts, so agents can ask `story_trace` ("which code implements this
 story, and did its ACs pass QA?") and `impact` ("what's the blast radius of
 changing these files?"). Deterministic and offline; the **persisted graph**
@@ -25,7 +25,7 @@ SDK), `gate-integration/` (v0.3.1 — portable aSPARK gate integration blocks,
 `CacheUnusable` fallback, NFR-1 benchmark),
 `robustness/` (v0.4.1 — `find_nodes("")` empty-query guard, MCP stdio transport smoke test),
 `go-rust-support/` (v0.5.0 — Go and Rust extractors: `File`/`Class`/`Function` nodes,
-best-effort in-repo `imports` resolution; five languages supported),
+best-effort in-repo `imports` resolution; five languages supported; `kotlin-support/` (unreleased) adds Kotlin as a sixth),
 `security-posture/` (v0.6.0 — repo-confinement rule enforced on all nine tools
 (`.git`/`.spark`/a prior `.aspark-graph/graph.json` marker), build bounds
 (entry-count bound + 5 MB per-file cap + symlink-cycle termination), `SECURITY.md`
@@ -65,7 +65,7 @@ src/aspark_graph/
   server.py      thin adapter over queries.py/build.py (mcp-SDK FastMCP)
   inference.py   git-history inference of implements edges (v0.2.0)
   git.py         offline, deterministic git helpers (no timestamps)
-  extractors/    code_py / code_ts / code_java + base + dispatch
+  extractors/    code_py / code_ts / code_java / code_go / code_rust / code_kotlin + base + dispatch
 ```
 
 **Load-bearing rule:** `cli.py` and `server.py` are *thin adapters* — they parse
@@ -78,7 +78,7 @@ each adapter. Never compute an answer in an adapter.
 
 - **Determinism (AC-1.2).** The graph must rebuild byte-for-byte on an unchanged
   repo. Persistence is canonical (sorted nodes/edges, `sort_keys`). Parse-
-  affecting deps (the five tree-sitter grammars + core) are pinned `==`;
+  affecting deps (the six tree-sitter grammars + core) are pinned `==`;
   `uv.lock` covers the rest. There is a byte-identical double-build test — keep it.
 - **Fail loudly on template drift (AC-1.3).** `artifacts.py` is pinned to a
   supported template shape and raises `TemplateDriftError` naming the file + the
