@@ -19,7 +19,7 @@
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
 - **Summary:** Catch `artifacts.TemplateDriftError` once in the `server.build_graph` adapter and return `{"built": false, "reason": "template_drift", "file", "message"}`; no change to `artifacts.py`, `build.py`, `queries.py` or `cli.py`. Implementation already committed (6cf4a95); remaining work is verification only.
-- **Open:** `5 tasks not done` — see §3 Task Breakdown for which
+- **Open:** `none` — all 8 tasks `done` (§3)
 - **Binding ruling:** §3 Task Breakdown for current task status; a plan revision after review/QA findings updates §1/§3 in place, never a new section
 - **On conflict:** the numbered body below wins for everything except `Status`; log the mismatch as a finding at the next `/peer-review` and proceed — don't stop on it.
 

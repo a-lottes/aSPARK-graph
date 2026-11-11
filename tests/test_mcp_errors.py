@@ -68,19 +68,21 @@ def test_build_graph_review_drift_returns_structured_result(tmp_path):
     assert data["built"] is False
     assert data["reason"] == "template_drift"
     assert data["file"].endswith("review.md")
+    assert "Findings" in data["message"]
     assert not (tmp_path / ".aspark-graph" / "graph.json").exists()
 
 
 def test_cli_drift_is_one_line_nonzero_and_matches_mcp_message(tmp_path, capsys):
     from aspark_graph import cli
 
-    _drifted_repo(tmp_path, "qa.md", "# QA\n\nnothing\n")
+    bad = _drifted_repo(tmp_path, "qa.md", "# QA\n\nnothing\n")
     mcp = server.build_graph(str(tmp_path))
     assert cli.main(["build", str(tmp_path)]) != 0
-    err = capsys.readouterr().err
+    captured = capsys.readouterr()
+    err = captured.err
     assert err.strip() == mcp["message"]
     assert "\n" not in err.strip()
-    assert "Traceback" not in err
+    assert bad.name in err and "Traceback" not in err and "Traceback" not in captured.out
     assert not (tmp_path / ".aspark-graph" / "graph.json").exists()
 
 
