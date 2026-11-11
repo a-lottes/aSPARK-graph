@@ -85,3 +85,14 @@ def test_running_index_keeps_same_ac_in_two_tables_distinct(tmp_path):
     trace = queries.story_trace(graph, "US-1", feature="demo")
     ac = next(a for a in trace["acceptance_criteria"] if a["ac"] == "AC-1.1")
     assert ac["latest_result"] == "pass"
+
+
+def test_row_index_advances_on_non_ac_rows(tmp_path):
+    """NFR-2: non-AC rows (e.g. NFR-1) still consume an index, as in the old single-table code."""
+    t = (
+        "### a\n\n" + HEAD + "| NFR-1 | a | b | b | ✅ pass |\n\n"
+        "### b\n\n" + HEAD + "| AC-1.1 | a | b | b | ✅ pass |\n"
+    )
+    graph, _ = build_graph(_repo(tmp_path, t))
+    ids = [n["id"] for n in graph.nodes() if n["id"].startswith("qa:demo:AC-1.1#")]
+    assert ids == ["qa:demo:AC-1.1#1"]

@@ -93,4 +93,4 @@
 - [x] Task order respects dependencies
 - [x] Test strategy covers every Must story
 - [x] Line budget respected: Ist 91 / Soll ~300 (excluding HTML comments)
-- [ ] Status set to `approved` by the user
+- [x] Status set to `approved` by the user
