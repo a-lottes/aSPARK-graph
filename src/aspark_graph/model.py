@@ -17,6 +17,7 @@ class NodeType(str, Enum):
     FUNCTION = "Function"
     # Artifact layer (parsed from .spark/ templates)
     FEATURE = "Feature"
+    RELEASE = "Release"
     STORY = "Story"
     ACCEPTANCE_CRITERION = "AcceptanceCriterion"
     TASK = "Task"
@@ -33,6 +34,7 @@ class EdgeType(str, Enum):
     HAS_STORY = "has_story"    # Feature -> Story
     HAS_AC = "has_ac"          # Story -> AcceptanceCriterion
     HAS_TASK = "has_task"      # Feature -> Task
+    RELEASED_AS = "released_as"  # Feature -> Release
     MAPS_TO = "maps_to"        # Task -> Story
     IMPLEMENTS = "implements"  # Task -> File/Function (best-effort)
     VERIFIES = "verifies"      # QACheck -> AcceptanceCriterion
@@ -67,6 +69,10 @@ def definition_id(relpath: str, qualname: str) -> str:
 
 def feature_id(name: str) -> str:
     return f"feature:{name}"
+
+
+def release_id(feature: str, version: str) -> str:
+    return f"release:{feature}:{version}"
 
 
 def story_id(feature: str, story: str) -> str:

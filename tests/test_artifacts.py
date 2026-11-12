@@ -127,3 +127,29 @@ def test_valid_dogfood_spec_parses_without_drift():
     added = extract_features(repo_root, graph)
     assert added > 0
     assert graph.has_node(story_id("aspark-graph", "US-1"))
+
+
+def test_release_node_and_released_as_edge(tmp_path):
+    import subprocess
+    from aspark_graph.build import build_graph
+
+    def sh(*a):
+        subprocess.run(a, cwd=tmp_path, check=True, capture_output=True)
+
+    sh("git", "init", "-q")
+    f = tmp_path / ".spark" / "f"
+    f.mkdir(parents=True)
+    (f / "release.md").write_text(
+        "| **Status** | done |\n| **Version** | `v0.7.1` (hotfix) |\n| **Date** | 2026-01-02 |\n"
+    )
+    (tmp_path / "a").write_text("x")
+    sh("git", "add", ".")
+    sh("git", "-c", "user.name=a", "-c", "user.email=a@b", "commit", "-qm", "m")
+    g, _ = build_graph(tmp_path)
+    assert g.get_node("release:f:v0.7.1").get("commit") is None  # no tag: never guessed
+    sh("git", "tag", "v0.7.1")
+    g, _ = build_graph(tmp_path)
+    n = g.get_node("release:f:v0.7.1")
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True).stdout.strip()
+    assert (n["version"], n["status"], n["date"], n["commit"]) == ("v0.7.1", "done", "2026-01-02", sha)
+    assert g.get_node("feature:f")["release_status"] == "done"
