@@ -26,7 +26,7 @@
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
 - **Verdict:** Passed. Every AC and NFR verified by tests, an old-vs-new-code build diff, and a Core real-repo check. 1 open (Nit F4); reviewer added one test (F1).
-- **Open:** `2 open` — Blockers: none; Majors: none (Minors/Nits: see §3)
+- **Open:** `1 open` — Blockers: none; Majors: none (Minors/Nits: see §3)
 - **Binding ruling:** §6 Verdict and the gate checklist below — the only binding location; there is no other round to point to
 - **On conflict:** the numbered body below wins for everything except `Status`; log the mismatch as a finding at the next `/peer-review` and proceed — don't stop on it.
 
@@ -87,7 +87,7 @@ Evidence (re-derived, F2):
 
 ## 6. Verdict
 
-Passed. The change does what US-1 asks. `_parse_qa` reads every pipe-table in the verification section and keeps the first table strict and later non-verification tables lenient. The running index leaves single-table output unchanged. I proved this with byte-identical graph.json under pre-change (= v0.7.3 parser) and new code, on the fixture and on the live repo. On the real Core trail, exactly the four G6 files gain their missing checks and nothing else moves. There are no Blockers or Majors. I fixed F1 (an untested half of AC-1.4 and the skip-doesn't-advance-index rule, both shown by surviving mutants) by adding one test. I fixed F2 by recording the T3 evidence here. F3 (a non-template `## Deviations` heading in plan.md) and F4 (T2 DoD wording drift) remain open for `/increment` or the Engineering Manager. Neither affects behaviour. Binding for later phases (plan risk 1): any QA artifact for this trail must keep its Acceptance Criteria Verification as **one** table. Otherwise the shipped tool reads it differently from v0.7.3, and the live-repo byte-identity proof is void.
+Passed. The change does what US-1 asks. `_parse_qa` reads every pipe-table in the verification section and keeps the first table strict and later non-verification tables lenient. The running index leaves single-table output unchanged. I proved this with byte-identical graph.json under pre-change (= v0.7.3 parser) and new code, on the fixture and on the live repo. On the real Core trail, exactly the four G6 files gain their missing checks and nothing else moves. There are no Blockers or Majors. I fixed F1 (an untested half of AC-1.4 and the skip-doesn't-advance-index rule, both shown by surviving mutants) by adding one test. I fixed F2 by recording the T3 evidence here. F3 (a non-template `## Deviations` heading in plan.md) was fixed afterwards by folding it into §1; F4 (T2 DoD wording drift) remains open. Neither affects behaviour. Binding for later phases (plan risk 1): any QA artifact for this trail must keep its Acceptance Criteria Verification as **one** table. Otherwise the shipped tool reads it differently from v0.7.3, and the live-repo byte-identity proof is void.
 
 ---
 
