@@ -281,18 +281,25 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    tables = [t for t in _tables(section, unescape_pipes=True) if t is not None]
     added = 0
     offset = 0
-    for position, table in enumerate(tables, start=1):
+    first = True
+    for position, table in enumerate(_tables(section, unescape_pipes=True), start=1):
+        if table is None:
+            continue
+        is_first, first = first, False
         header = {k.lower() for k in table["header"]}
         id_col = _qa_id_column(table["header"])
         if id_col is None:
-            if position == 1:
+            if is_first:
                 raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
             continue  # a later table without an id column is a notes table
+        if not is_first and not any(
+            re.search(r"AC-\d+\.\d+", _col(r, id_col) or "") for r in table["rows"]
+        ):
+            continue  # loose "ac…" header (e.g. "Action") but no AC ids: a notes table
         if not any("result" in h for h in header):
-            where = "" if position == 1 else f" (table {position})"
+            where = "" if is_first else f" (table {position})"
             raise TemplateDriftError(str(path), f"QA table{where} missing a 'Result' column (found {sorted(header)})")
         for index, row in enumerate(table["rows"], start=offset):
             ac_cell = _col(row, id_col)

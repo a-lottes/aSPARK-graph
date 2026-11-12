@@ -52,12 +52,21 @@ def test_ac_in_two_tables_keeps_both_checks_in_order(tmp_path):
 
 
 def test_later_table_verdicts_reach_queries(tmp_path):
-    graph, _ = build_graph(_repo(tmp_path, T1 + T2))
+    first = "### US-1\n\n| Spec ID | Result |\n|---|---|\n| AC-1.1 | ✅ pass |\n\n"
+    later = "### More\n\n| Spec ID | Result |\n|---|---|\n| AC-1.2 | ✅ pass |\n| AC-2.1 | ❌ fail |\n\n"
+    graph, _ = build_graph(_repo(tmp_path, first + later))
     unverified = {a["id"] for a in queries.gate_health(graph, "demo")["unverified_acs"]}
-    assert ac_id("demo", "AC-1.2") not in unverified
+    assert ac_id("demo", "AC-1.2") not in unverified  # pass read from a later table
     assert ac_id("demo", "AC-2.1") in unverified  # fail verdict, not a pass
     trace = queries.story_trace(graph, "US-2", feature="demo")
-    assert "fail" in str(trace)
+    [ac] = [a for a in trace["acceptance_criteria"] if a["ac"] == "AC-2.1"]
+    assert ac["latest_result"] == "fail"
+
+
+def test_malformed_first_run_then_valid_table_produces_checks(tmp_path):
+    # R2: a malformed first pipe run no longer hides a valid later table.
+    graph, _ = build_graph(_repo(tmp_path, "| Spec ID | Result |\n\n" + T2))
+    assert [(c["ac"], c["order"]) for c in _checks(graph)] == [("AC-2.1", 0)]
 
 
 def test_notes_table_without_id_column_is_skipped(tmp_path):
@@ -77,3 +86,9 @@ def test_later_table_with_id_but_no_result_is_drift(tmp_path):
 def test_first_table_without_result_is_still_drift(tmp_path):
     with pytest.raises(TemplateDriftError):
         build_graph(_repo(tmp_path, "| Spec ID | Notes |\n|---|---|\n| AC-1.1 | x |\n"))
+
+
+def test_notes_table_with_loose_ac_prefix_header_is_skipped(tmp_path):
+    notes = "| Item | Action |\n|---|---|\n| a | b |\n\n"
+    graph, _ = build_graph(_repo(tmp_path, T1 + notes + T2))
+    assert [c["ac"] for c in _checks(graph)] == ["AC-1.1", "AC-1.2", "AC-2.1"]

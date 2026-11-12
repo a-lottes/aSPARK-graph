@@ -237,7 +237,7 @@ zurück. Gegenseite ist Item C3 im aSPARK-Repo — nicht ohne sie releasen.
 
 ### G6 · `qa-multi-table` — alle Tabellen der QA-Verifikation lesen
 
-**✅ Erledigt (Feature `qa-multi-table`, Issue #72): `_parse_qa` liest alle Tabellen der Sektion; fortlaufender Index, Notiztabellen ohne ID-Spalte werden übersprungen.**
+**✅ Erledigt (Feature `qa-multi-table`, Issue #72): `_parse_qa` liest alle Tabellen der Sektion; fortlaufender Index, Notiztabellen ohne ID-Spalte werden übersprungen. Version: wird bei `/go-live` ergänzt.**
 
 **Priorität: Nach v0.7.1. Aufgenommen am 2026-09-24 (Plan-Gate von `current-artifact-names`, Q1).**
 
