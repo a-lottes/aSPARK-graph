@@ -29,11 +29,11 @@ Consequences: a `qa.md` whose first pipe run is malformed but which has a valid 
 
 | # | Task | Story | Covers (AC / NFR) | Depends on | Status | Definition of Done |
 |---|---|---|---|---|---|---|
-| T1 | Add `_tables`; reimplement `_first_table` on top of it. | US-2 | AC-2.1 | – | `todo` | Existing suite green with no test edits. New unit tests check that `_tables` yields every table in order, yields `None` for a malformed run, and that `_first_table` still returns `None` when the first run is malformed even though a valid table follows — files: src/aspark_graph/artifacts.py, tests/test_qa_multi_table.py |
-| T2 | `_parse_qa` loops over all tables with a running index; strict first table, skip later tables without an id column, drift for a later table with an id column but no Result column. | US-1, US-2 | AC-1.1, AC-1.3, AC-2.2 | T1 | `todo` | Tests on a `### US-n` multi-table fixture: one QACheck per AC row of every table, each with a `verifies` edge. Ids are unique, and an AC listed in two tables has both checks in document order. A notes table is skipped. A later table missing Result raises `TemplateDriftError` naming the file. First-table drift tests in `test_current_names.py` still pass — files: src/aspark_graph/artifacts.py, tests/test_qa_multi_table.py |
-| T3 | Query-level verdicts from later tables. | US-1 | AC-1.2 | T2 | `todo` | A test builds the fixture repo (with a `.git` marker) and asserts that `gate_health` counts a later-table AC as verified (pass), and that `story_trace` shows that AC's `latest_result`, including a fail in a later table — files: tests/test_qa_multi_table.py |
-| T4 | Byte-identity proof against pre-change code. | US-2 | AC-2.1 | T2 | `todo` | `git stash` round-trip: build this repo plus `tests/fixtures/current_names_repo` under the old code and the new code; `diff` of the two graph.json files is empty. Commands and SHA are recorded in the review. The double-build test is still green. No file changes. |
-| T5 | Mark BACKLOG G6 done. | US-3 | AC-3.1 | T2 | `todo` | The G6 entry carries a done marker naming `qa-multi-table` and the version — files: .spark/BACKLOG.md |
+| T1 | Add `_tables`; reimplement `_first_table` on top of it. | US-2 | AC-2.1 | – | `done` | Existing suite green with no test edits. New unit tests check that `_tables` yields every table in order, yields `None` for a malformed run, and that `_first_table` still returns `None` when the first run is malformed even though a valid table follows — files: src/aspark_graph/artifacts.py, tests/test_qa_multi_table.py |
+| T2 | `_parse_qa` loops over all tables with a running index; strict first table, skip later tables without an id column, drift for a later table with an id column but no Result column. | US-1, US-2 | AC-1.1, AC-1.3, AC-2.2 | T1 | `done` | Tests on a `### US-n` multi-table fixture: one QACheck per AC row of every table, each with a `verifies` edge. Ids are unique, and an AC listed in two tables has both checks in document order. A notes table is skipped. A later table missing Result raises `TemplateDriftError` naming the file. First-table drift tests in `test_current_names.py` still pass — files: src/aspark_graph/artifacts.py, tests/test_qa_multi_table.py |
+| T3 | Query-level verdicts from later tables. | US-1 | AC-1.2 | T2 | `done` | A test builds the fixture repo (with a `.git` marker) and asserts that `gate_health` counts a later-table AC as verified (pass), and that `story_trace` shows that AC's `latest_result`, including a fail in a later table — files: tests/test_qa_multi_table.py |
+| T4 | Byte-identity proof against pre-change code. | US-2 | AC-2.1 | T2 | `done` | `git stash` round-trip: build this repo plus `tests/fixtures/current_names_repo` under the old code and the new code; `diff` of the two graph.json files is empty. Commands and SHA are recorded in the review. The double-build test is still green. No file changes. |
+| T5 | Mark BACKLOG G6 done. | US-3 | AC-3.1 | T2 | `done` | The G6 entry carries a done marker naming `qa-multi-table` and the version — files: .spark/BACKLOG.md |
 
 ## 4. Test Strategy
 
@@ -59,3 +59,7 @@ Consequences: a `qa.md` whose first pipe run is malformed but which has a valid 
 - [x] Line budget: about 50 lines (Ist) against the compact csharp-support format (Soll: same shape, under 60).
 
 Approved (autonomous line, gate pre-approved by the caller).
+
+## Deviations
+
+- T4: stash round-trip compared this repo and `current_names_repo`. The fixture is byte-identical; this repo differs only by `artifacts.py` symbol/line entries (the code itself changed), no QA/story/AC nodes.
