@@ -127,3 +127,19 @@ def test_valid_dogfood_spec_parses_without_drift():
     added = extract_features(repo_root, graph)
     assert added > 0
     assert graph.has_node(story_id("aspark-graph", "US-1"))
+
+
+def test_tables_returns_every_table_in_order():
+    from aspark_graph.artifacts import _tables
+    block = ["### US-1", "| A | B |", "|---|---|", "| 1 | 2 |", "", "### US-2",
+             "| | C |", "|---|---|", "| x | y\\|z |"]
+    t = _tables(block, unescape_pipes=True)
+    assert [x["header"] for x in t] == [["A", "B"], ["", "C"]]
+    assert t[1]["rows"] == [{"": "x", "c": "y|z"}]
+
+
+def test_tables_skips_separatorless_block_and_empty():
+    from aspark_graph.artifacts import _tables
+    assert _tables([]) == []
+    block = ["| not | table |", "| x | y |", "", "| A |", "|---|", "| 1 |"]
+    assert [x["header"] for x in _tables(block)] == [["A"]]
