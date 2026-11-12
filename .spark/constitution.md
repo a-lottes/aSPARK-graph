@@ -96,7 +96,7 @@
 - **Test practice:** `inferred from pyproject.toml, tests/` — pytest (319 default + 4 `slow`), run via `uv run pytest`.
 - **Conventions:** `inferred from CLAUDE.md`; no `CONTRIBUTING.md` (`not found`).
 - **How to run:** `inferred from CLAUDE.md, README.md` — `uv sync --extra dev`, `uv run aspark-graph build .`, or `uvx aspark-graph serve`.
-- **Known pain points:** `inferred from .spark/BACKLOG.md` — only the first QA table per `qa.md` is read (G6); git <2.15, monorepo subprojects and `--filter=tree:0` limits (G11); `__version__` stale at 0.1.0; no CI config found.
+- **Known pain points:** `inferred from .spark/BACKLOG.md` — git <2.15, monorepo subprojects and `--filter=tree:0` limits (G11); `__version__` stale at 0.1.0; no CI config found.
 
 ## 10. Companions
 
@@ -111,3 +111,4 @@
 | Date | Change | Why |
 |---|---|---|
 | 2026-11-09 | Initial constitution | Project kickoff |
+| 2026-11-12 | §9 Known pain points: G6 dropped | `qa-multi-table` reads every QA table (spec C6) |

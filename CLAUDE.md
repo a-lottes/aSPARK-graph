@@ -38,8 +38,8 @@ keeps the published sdist to exactly `src/`, `tests/`, `README.md`, `LICENSE`,
 `current-artifact-names/` (v0.7.1 — reads Core's current artifact names
 `review.md`/`qa.md`/`release.md` alongside the legacy `*-report.md`/`release-notes.md`;
 current name wins, the ignored legacy file is named on stderr / `ignored_legacy_files`;
-QA result cells read marker-first, an escaped `\|` keeps its columns; known limits:
-only the first QA verification table per `qa.md` is read (BACKLOG G6)),
+QA result cells read marker-first, an escaped `\|` keeps its columns; its known limit
+G6 (per-story QA tables after the first went unread) was lifted by `qa-multi-table`),
 `shallow-clone-warning/` (v0.7.2 — a shallow or git-less build names the condition
 on stderr and in the MCP `build_graph` booleans `shallow_history`/`no_git_history`;
 grafted boundary commits contribute no inferred links, so truncated history only
@@ -160,7 +160,7 @@ each adapter. Never compute an answer in an adapter.
   Core and steamcore during `/increment` and `/demo-day` found what synthetic
   fixtures could not: an escaped pipe in a QA cell (B1, the only Major that
   survived to QA), a `⚠️ ... passed` cell that the word matcher read as pass, and
-  4 of 13 Core `qa.md` files split into per-story tables (B2, G6). Record SHAs and
+  4 of 13 Core `qa.md` files split into per-story tables (B2, G6 — lifted by `qa-multi-table`). Record SHAs and
   counts next to such evidence so it can be re-derived.
 - **Result cells are read marker-first (`❌` > `⚠` > `✅`), words second.** A marker
   is the author's explicit verdict; a word can sit inside a caveat. Consequence:
@@ -244,7 +244,7 @@ aspark-graph query gate_health aspark-graph
 ```bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # uv lives in ~/.local/bin here
 uv sync --extra dev
-uv run pytest                # 403 tests; keep green
+uv run pytest                # 416 tests; keep green
 uv run pytest -m slow        # 4 slow tests: NFR-1 bench, MCP transport smoke, sdist manifest, unlocked fresh install
 uv run aspark-graph build .  # writes .aspark-graph/graph.json (gitignored)
 uv run aspark-graph query story_trace US-2 --repo .
