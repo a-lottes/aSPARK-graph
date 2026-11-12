@@ -127,3 +127,72 @@ def test_valid_dogfood_spec_parses_without_drift():
     added = extract_features(repo_root, graph)
     assert added > 0
     assert graph.has_node(story_id("aspark-graph", "US-1"))
+
+
+# --- qa-multi-table: every table in the verification section is read --------
+
+def _qa_repo(tmp_path, qa_body, name="qa.md"):
+    feature = tmp_path / ".spark" / "multi"
+    feature.mkdir(parents=True)
+    (feature / "spec.md").write_text(
+        "# Spec: multi\n\n| **Status** | approved |\n\n## 4. User Stories\n\n"
+        "### US-1 (Must): a\n\n- [ ] AC-1.1: x\n"
+    )
+    (feature / name).write_text(
+        "# QA\n\n| **Status** | passed |\n\n## 3. Acceptance Criteria Verification\n\n" + qa_body
+    )
+    return tmp_path
+
+
+_HDR = "| AC | Result | Date |\n|---|---|---|\n"
+_MULTI = (
+    "### US-1\n\n" + _HDR + "| AC-1.1 | ✅ pass | d |\n| AC-1.2 | ✅ pass | d |\n\n"
+    "prose between tables\n\n### US-2\n\n" + _HDR
+    + "| NFR-1 | ✅ pass | d |\n| AC-2.1 | ⚠️ passed with caveat | d |\n\n"
+    "### US-3\n\n| broken | run |\n| no | separator |\n\n" + _HDR
+    + "| AC-3.1 | ❌ fail | d |\n| AC-3.2 | ✅ a \\| b | d |\n"
+)
+
+
+def _qa_nodes(g):
+    return sorted(g.nodes("QACheck"), key=lambda d: d["order"])
+
+
+def test_qa_reads_all_tables_with_running_index(tmp_path):
+    repo = _qa_repo(tmp_path, _MULTI)
+    g = Graph()
+    extract_features(repo, g)
+    nodes = _qa_nodes(g)
+    assert [n["ac"] for n in nodes] == ["AC-1.1", "AC-1.2", "AC-2.1", "AC-3.1", "AC-3.2"]
+    assert [n["order"] for n in nodes] == [0, 1, 3, 4, 5]  # NFR row consumed index 2
+    assert [n["result"] for n in nodes] == ["pass", "pass", "unknown", "fail", "pass"]
+
+
+def test_qa_no_table_is_zero(tmp_path):
+    g = Graph()
+    extract_features(_qa_repo(tmp_path, "nothing here\n"), g)
+    assert _qa_nodes(g) == []
+
+
+@pytest.mark.parametrize("name", ["qa.md", "qa-report.md"])
+@pytest.mark.parametrize("bad,needle", [
+    ("| Thing | Result |\n|---|---|\n| x | ✅ |\n", "AC"),
+    ("| AC | Notes |\n|---|---|\n| AC-2.1 | x |\n", "Result"),
+])
+def test_qa_drift_in_later_table(tmp_path, name, bad, needle):
+    repo = _qa_repo(tmp_path, _HDR + "| AC-1.1 | ✅ | d |\n\n### US-2\n\n" + bad, name)
+    with pytest.raises(TemplateDriftError) as exc:
+        extract_features(repo, Graph())
+    assert exc.value.file.endswith(name)
+    assert needle in exc.value.mismatch
+
+
+def test_qa_multi_table_double_build_identical(tmp_path):
+    from aspark_graph import cli
+    repo = _qa_repo(tmp_path, _MULTI)
+    (repo / ".git").mkdir()
+    outs = []
+    for _ in range(2):
+        assert cli.main(["build", str(repo), "--full"]) == 0
+        outs.append((repo / ".aspark-graph" / "graph.json").read_bytes())
+    assert outs[0] == outs[1]
