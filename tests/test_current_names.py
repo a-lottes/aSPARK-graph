@@ -337,3 +337,29 @@ def test_c14_default_split_still_separates_on_every_pipe():
     # scope guard: review/plan tables keep their current splitting (AC-5.1)
     assert _split_row("| a | b\\|c | d |") == ["a", "b\\", "c", "d"]
     assert _split_row("| a | b\\|c | d |", True) == ["a", "b|c", "d"]
+
+
+# --- MCP build_graph returns drift as a structured result (BACKLOG G7) -------
+
+def test_mcp_build_graph_returns_template_drift_and_writes_nothing(tmp_path):
+    from aspark_graph import server
+
+    repo = _copy_repo(tmp_path)
+    bad = repo / ".spark" / "demo" / "qa.md"
+    bad.write_text("# QA Report: demo\n\n## 5. Verdict\n\nFine.\n")
+
+    result = server.build_graph(str(repo))
+    assert result["built"] is False
+    assert result["reason"] == "template_drift"
+    assert result["file"].endswith("qa.md")
+    assert "template drift" in result["message"]
+    assert not (repo / ".aspark-graph" / "graph.json").exists()
+
+    # An existing graph.json is left unchanged by a failed build.
+    good = _copy_repo(tmp_path / "ok")
+    assert "graph_path" in server.build_graph(str(good))
+    gpath = good / ".aspark-graph" / "graph.json"
+    before = gpath.read_bytes()
+    (good / ".spark" / "demo" / "qa.md").write_text(bad.read_text())
+    assert server.build_graph(str(good))["reason"] == "template_drift"
+    assert gpath.read_bytes() == before

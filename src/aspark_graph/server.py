@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from . import confinement, queries
+from . import artifacts, confinement, queries
 from .build import build_graph as _build_graph
 
 mcp = FastMCP("aspark-graph")
@@ -26,6 +26,10 @@ def build_graph(path: str = ".") -> dict:
         graph, report = _build_graph(path)
     except confinement.RepoRefused as exc:
         return {"found": False, "reason": exc.reason, "message": str(exc)}
+    except artifacts.TemplateDriftError as exc:
+        # Raised before graph.save(), so nothing is written and an existing
+        # graph.json is left untouched.
+        return {"built": False, "reason": "template_drift", "file": exc.file, "message": str(exc)}
     out_path = graph.save(queries.default_graph_path(path))
     return {
         "code_entities": report.code_entities,
