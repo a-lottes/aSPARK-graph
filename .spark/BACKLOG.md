@@ -235,7 +235,7 @@ statt als strukturelle Vermutung zu melden. Fehlender Marker fällt auf die heut
 zurück. Gegenseite ist Item C3 im aSPARK-Repo — nicht ohne sie releasen.
 ```
 
-### G6 · `qa-multi-table` — alle Tabellen der QA-Verifikation lesen
+### G6 · `qa-multi-table` — alle Tabellen der QA-Verifikation lesen — ✅ gelöst (`qa-multi-table`, #70)
 
 **Priorität: Nach v0.7.1. Aufgenommen am 2026-09-24 (Plan-Gate von `current-artifact-names`, Q1).**
 

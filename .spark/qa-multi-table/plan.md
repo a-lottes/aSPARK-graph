@@ -13,7 +13,7 @@
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status`).
 - **Summary:** New `_tables()` helper returns every pipe-table in a block; `_first_table` delegates to it, unchanged. `_parse_qa` loops over all tables in the verification section: the first table stays strict, later non-verification tables are skipped, and the QA-check index keeps counting across tables. Single-table output stays byte-identical.
-- **Open:** `4 tasks not done` — see §3 Task Breakdown for which
+- **Open:** `none` — all tasks done
 - **Binding ruling:** §3 Task Breakdown for current task status; a plan revision after review/QA findings updates §1/§3 in place, never a new section
 - **On conflict:** the numbered body below wins for everything except `Status`; log the mismatch as a finding at the next `/peer-review` and proceed — don't stop on it.
 
@@ -49,10 +49,10 @@
 
 | # | Task | Story | Covers (AC / NFR) | Depends on | Status | Definition of Done |
 |---|---|---|---|---|---|---|
-| T1 | Add `_tables` helper, make `_first_table` delegate to it, and loop `_parse_qa` over all tables (strict first run, lenient later runs, running index) | US-1 | AC-1.1, AC-1.2, AC-1.4, AC-1.5, NFR-2 | – | `todo` | Existing `uv run pytest` is fully green with no test edits (proves `_first_table` behaviour and single-table output are unchanged). A multi-table `qa.md` built locally yields one QA check per AC row across all tables. No new exception type: the only raise is the existing `TemplateDriftError` on the first table — files: src/aspark_graph/artifacts.py |
-| T2 | Multi-table tests | US-1 | AC-1.1, AC-1.2, AC-1.4, AC-1.5, NFR-1 | T1 | `todo` | New tests pass: (a) a 3-table `### US-n` fixture gives every AC a QA check with its recorded result; (b) `gate_health` and `story_trace` report the second/third-table ACs as their result, not `unverified`; (c) a first table without an AC/Spec ID column, and one without a Result column, each raise `TemplateDriftError`; (d) a later bug table without those columns is skipped with no error and adds no checks; (e) the same AC in tables 1 and 3 gives two checks, and the table-3 result is the latest; (f) ids/`order` run continuously and are unique; (g) a double build of the fixture is byte-identical. The fixture lives in `tmp_path` with a `.git` marker — files: tests/test_qa_multi_table.py |
-| T3 | Pre- vs post-change determinism proof (manual stash round-trip) | US-1 | AC-1.3, NFR-1 | T1 | `todo` | Build `tests/fixtures/current_names_repo` (single-table `qa.md`) and the repo itself under pre-change code (`git stash`), then under post-change code. `diff` of each graph.json pair is empty. Commands, HEAD SHA and the diff result are recorded in the T3 commit message / review evidence |
-| T4 | Mark BACKLOG G6 resolved | US-1 | AC-1.1 | T2 | `todo` | The G6 heading in `.spark/BACKLOG.md` carries a resolved marker naming `qa-multi-table`, in the file's existing (German) style, and no other entry changes — files: .spark/BACKLOG.md |
+| T1 | Add `_tables` helper, make `_first_table` delegate to it, and loop `_parse_qa` over all tables (strict first run, lenient later runs, running index) | US-1 | AC-1.1, AC-1.2, AC-1.4, AC-1.5, NFR-2 | – | `done` | Existing `uv run pytest` is fully green with no test edits (proves `_first_table` behaviour and single-table output are unchanged). A multi-table `qa.md` built locally yields one QA check per AC row across all tables. No new exception type: the only raise is the existing `TemplateDriftError` on the first table — files: src/aspark_graph/artifacts.py |
+| T2 | Multi-table tests | US-1 | AC-1.1, AC-1.2, AC-1.4, AC-1.5, NFR-1 | T1 | `done` | New tests pass: (a) a 3-table `### US-n` fixture gives every AC a QA check with its recorded result; (b) `gate_health` and `story_trace` report the second/third-table ACs as their result, not `unverified`; (c) a first table without an AC/Spec ID column, and one without a Result column, each raise `TemplateDriftError`; (d) a later bug table without those columns is skipped with no error and adds no checks; (e) the same AC in tables 1 and 3 gives two checks, and the table-3 result is the latest; (f) ids/`order` run continuously and are unique; (g) a double build of the fixture is byte-identical. The fixture lives in `tmp_path` with a `.git` marker — files: tests/test_qa_multi_table.py |
+| T3 | Pre- vs post-change determinism proof (manual stash round-trip) | US-1 | AC-1.3, NFR-1 | T1 | `done` | Build `tests/fixtures/current_names_repo` (single-table `qa.md`) and the repo itself under pre-change code (`git stash`), then under post-change code. `diff` of each graph.json pair is empty. Commands, HEAD SHA and the diff result are recorded in the T3 commit message / review evidence |
+| T4 | Mark BACKLOG G6 resolved | US-1 | AC-1.1 | T2 | `done` | The G6 heading in `.spark/BACKLOG.md` carries a resolved marker naming `qa-multi-table`, in the file's existing (German) style, and no other entry changes — files: .spark/BACKLOG.md |
 
 Walking skeleton: T1 alone is runnable end-to-end (`aspark-graph build` on a multi-table repo shows the new checks via `gate_health`).
 
@@ -90,3 +90,8 @@ Walking skeleton: T1 alone is runnable end-to-end (`aspark-graph build` on a mul
 - [x] Test strategy covers every Must story
 - [x] Line budget respected: Ist 74 / Soll ~300 (excluding HTML comments)
 - [x] Status set to `approved` by the user
+
+## Deviations
+
+- T3: on the live repo the pre/post graph.json differ only by the two new `def:` nodes (`_tables`, `_parse_run`) and their edges from the changed source itself; no QA/artifact node or edge changed. `tests/fixtures/current_names_repo` is byte-identical.
+- `_parse_run` split out of `_tables` as a small helper (same logic as the old `_first_table` body).
