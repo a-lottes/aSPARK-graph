@@ -281,9 +281,13 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    table = _first_table(section, unescape_pipes=True)
-    if table is None:
+    tables = _all_tables(section, unescape_pipes=True)
+    if not tables:
         return 0
+    # The first table is strict (drift raises). Per-story reports split the
+    # section into one table per story: later tables with the same shape are
+    # read too; a later table without an id+Result column is some other table.
+    table = tables[0]
     header = {k.lower() for k in table["header"]}
     id_col = _qa_id_column(table["header"])
     if id_col is None:
@@ -291,8 +295,15 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     if not any("result" in h for h in header):
         raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
 
+    entries = [(id_col, r) for r in table["rows"]]
+    for extra in tables[1:]:
+        extra_col = _qa_id_column(extra["header"])
+        if extra_col is None or not any("result" in k.lower() for k in extra["header"]):
+            continue
+        entries += [(extra_col, r) for r in extra["rows"]]
+
     added = 0
-    for index, row in enumerate(table["rows"]):
+    for index, (id_col, row) in enumerate(entries):
         ac_cell = _col(row, id_col)
         m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
         if not m:
@@ -361,15 +372,27 @@ def _section(lines: list[str], keyword: str) -> list[str] | None:
 
 def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
     """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}."""
-    rows: list[list[str]] = []
-    in_table = False
+    tables = _all_tables(block, unescape_pipes)
+    return tables[0] if tables else None
+
+
+def _all_tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
+    """Every well-formed pipe-table in ``block``, in order."""
+    groups: list[list[list[str]]] = []
+    current: list[list[str]] | None = None
     for line in block:
         stripped = line.strip()
         if stripped.startswith("|") and stripped.endswith("|"):
-            rows.append(_split_row(stripped, unescape_pipes))
-            in_table = True
-        elif in_table:
-            break  # table ended
+            if current is None:
+                current = []
+                groups.append(current)
+            current.append(_split_row(stripped, unescape_pipes))
+        else:
+            current = None
+    return [t for t in (_build_table(g) for g in groups) if t is not None]
+
+
+def _build_table(rows: list[list[str]]) -> dict | None:
     if len(rows) < 2:
         return None
     header = rows[0]

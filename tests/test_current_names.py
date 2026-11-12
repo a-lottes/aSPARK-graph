@@ -337,3 +337,20 @@ def test_c14_default_split_still_separates_on_every_pipe():
     # scope guard: review/plan tables keep their current splitting (AC-5.1)
     assert _split_row("| a | b\\|c | d |") == ["a", "b\\", "c", "d"]
     assert _split_row("| a | b\\|c | d |", True) == ["a", "b|c", "d"]
+
+
+def test_per_story_qa_tables_are_all_read(tmp_path):
+    """Issue #59: a qa.md split into one table per story reads every table."""
+    repo = _copy_repo(tmp_path)
+    qa = repo / ".spark" / "demo" / "qa.md"
+    text = qa.read_text()
+    row1 = "| AC-1.1 | call main | a value | a value | ✅ pass |"
+    row2 = next(l for l in text.splitlines() if l.startswith("| AC-1.2"))
+    assert row1 in text
+    header = next(l for l in text.splitlines() if "Spec ID" in l)
+    sep = header_sep = text.splitlines()[text.splitlines().index(header) + 1]
+    split = text.replace(row2 + "\n", "").replace(
+        row1 + "\n", row1 + f"\n\n### US-2\n\n{header}\n{sep}\n{row2}\n")
+    qa.write_text(split)
+    graph, _ = build_graph(repo)
+    assert queries.gate_health(graph, "demo")["unverified_acs"] == []
