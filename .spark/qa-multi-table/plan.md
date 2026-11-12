@@ -34,6 +34,7 @@
   | Strict on every table (drift error on any later table lacking AC/Result) | Rejected by spec C1/A2. Real Core `qa.md` files place summary and bug tables in the section, so this would turn today's silent undercount into a build failure for those repos. |
   | Per-table index namespace (`qa:<f>:<ac>#<table>.<row>`) | Changes every existing QA-check id, which breaks AC-1.3 byte identity. A running counter gives uniqueness for free. |
   | First *valid* table is strict (skip malformed leading pipe runs) | Could turn a file that builds today (first run malformed → 0 checks) into a new drift error. Mirroring today's "first run governs" guarantees no file goes from building to failing. |
+- **Build notes:** a small `_parse_run` helper holds the per-run shape logic split out of `_tables`. T3 on the live repo differs only by the two new `def:` nodes (`_tables`, `_parse_run`) of the changed source itself; `current_names_repo` is byte-identical.
 - **Consequences:** Easier: per-story QA layouts in Core work with no template change, and G6 closes. Harder: a later table that is really a mis-headed verification table is skipped silently. This is accepted by spec A2 and documented in a test. The QA check count rises for affected repos, which is intended.
 
 ## 2. Affected Components
@@ -90,8 +91,3 @@ Walking skeleton: T1 alone is runnable end-to-end (`aspark-graph build` on a mul
 - [x] Test strategy covers every Must story
 - [x] Line budget respected: Ist 74 / Soll ~300 (excluding HTML comments)
 - [x] Status set to `approved` by the user
-
-## Deviations
-
-- T3: on the live repo the pre/post graph.json differ only by the two new `def:` nodes (`_tables`, `_parse_run`) and their edges from the changed source itself; no QA/artifact node or edge changed. `tests/fixtures/current_names_repo` is byte-identical.
-- `_parse_run` split out of `_tables` as a small helper (same logic as the old `_first_table` body).

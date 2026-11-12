@@ -68,6 +68,19 @@ def test_later_non_verification_table_is_skipped(tmp_path):
     assert len(_checks(graph)) == 3  # the bug table adds nothing
 
 
+def test_skipped_middle_tables_add_nothing_and_keep_index(tmp_path):
+    # AC-1.4 second half: a later table lacking only the Result column is skipped too,
+    # and skipped tables do not advance the running index (plan §1 decision 5).
+    section = (
+        HEAD + "| AC-1.1 | a | b | b | ✅ pass |\n\n"
+        "| Spec ID | Notes |\n|---|---|\n| AC-1.2 | not a verification row |\n\n"
+        "| Bug | Severity |\n|---|---|\n| B1 | minor |\n\n"
+        + HEAD + "| AC-2.1 | a | b | b | ✅ pass |\n"
+    )
+    graph, _ = build_graph(_repo(tmp_path, section))
+    assert [(c[0], c[1]) for c in _checks(graph)] == [(0, "AC-1.1"), (1, "AC-2.1")]
+
+
 def test_same_ac_in_two_tables_latest_wins(tmp_path):
     section = HEAD + "| AC-1.1 | a | b | b | ❌ fail |\n\n" + HEAD + "| AC-1.1 | a | b | b | ✅ pass |\n"
     graph, _ = build_graph(_repo(tmp_path, section))
