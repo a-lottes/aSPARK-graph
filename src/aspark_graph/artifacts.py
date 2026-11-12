@@ -294,10 +294,8 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
             if is_first:
                 raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
             continue  # a later table without an id column is a notes table
-        if not is_first and not any(
-            re.search(r"AC-\d+\.\d+", _col(r, id_col) or "") for r in table["rows"]
-        ):
-            continue  # loose "ac…" header (e.g. "Action") but no AC ids: a notes table
+        if not is_first and not any(h.strip().lower() == id_col for h in table["header"]):
+            continue  # loose "ac…" header (e.g. "Action"): a notes table
         if not any("result" in h for h in header):
             where = "" if is_first else f" (table {position})"
             raise TemplateDriftError(str(path), f"QA table{where} missing a 'Result' column (found {sorted(header)})")

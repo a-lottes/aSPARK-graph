@@ -92,3 +92,10 @@ def test_notes_table_with_loose_ac_prefix_header_is_skipped(tmp_path):
     notes = "| Item | Action |\n|---|---|\n| a | b |\n\n"
     graph, _ = build_graph(_repo(tmp_path, T1 + notes + T2))
     assert [c["ac"] for c in _checks(graph)] == ["AC-1.1", "AC-1.2", "AC-2.1"]
+
+
+def test_later_notes_table_mentioning_an_ac_id_is_not_a_verification_table(tmp_path):
+    notes = "| # | Action | Owner |\n|---|---|---|\n| 1 | Re-verify AC-1.2 live | me |\n\n"
+    notes2 = "| Action | Result |\n|---|---|\n| Re-ran AC-1.2 | ✅ done |\n\n"
+    graph, _ = build_graph(_repo(tmp_path, T1 + notes + notes2 + T2))
+    assert [c["ac"] for c in _checks(graph)] == ["AC-1.1", "AC-1.2", "AC-2.1"]
