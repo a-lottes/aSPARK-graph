@@ -281,33 +281,34 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    table = _first_table(section, unescape_pipes=True)
-    if table is None:
-        return 0
-    header = {k.lower() for k in table["header"]}
-    id_col = _qa_id_column(table["header"])
-    if id_col is None:
-        raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
-    if not any("result" in h for h in header):
-        raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
+    tables = _all_tables(section, unescape_pipes=True)
 
     added = 0
-    for index, row in enumerate(table["rows"]):
-        ac_cell = _col(row, id_col)
-        m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
-        if not m:
-            continue
-        ac = m.group(1)
-        result = _normalise_result(_col(row, "result"))
-        node_id = qacheck_id(feature, ac, index)
-        graph.add_node(
-            node_id, NodeType.QA_CHECK,
-            ac=ac, result=result, date=_col(row, "date"), feature=feature, order=index,
-        )
-        target = ac_id(feature, ac)
-        if graph.has_node(target):
-            graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
-        added += 1
+    index = 0  # continuous across tables, so QACheck ids stay unique
+    for table in tables:
+        header = {k.lower() for k in table["header"]}
+        id_col = _qa_id_column(table["header"])
+        if id_col is None:
+            raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
+        if not any("result" in h for h in header):
+            raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
+        for row in table["rows"]:
+            row_index, index = index, index + 1
+            ac_cell = _col(row, id_col)
+            m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
+            if not m:
+                continue
+            ac = m.group(1)
+            result = _normalise_result(_col(row, "result"))
+            node_id = qacheck_id(feature, ac, row_index)
+            graph.add_node(
+                node_id, NodeType.QA_CHECK,
+                ac=ac, result=result, date=_col(row, "date"), feature=feature, order=row_index,
+            )
+            target = ac_id(feature, ac)
+            if graph.has_node(target):
+                graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
+            added += 1
     return added
 
 
@@ -361,15 +362,33 @@ def _section(lines: list[str], keyword: str) -> list[str] | None:
 
 def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
     """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}."""
-    rows: list[list[str]] = []
-    in_table = False
+    runs = _table_runs(block)
+    return _build_table(runs[0], unescape_pipes) if runs else None
+
+
+def _all_tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
+    """Every markdown pipe-table in ``block``, in document order."""
+    tables = (_build_table(run, unescape_pipes) for run in _table_runs(block))
+    return [t for t in tables if t is not None]
+
+
+def _table_runs(block: list[str]) -> list[list[str]]:
+    runs: list[list[str]] = []
+    current: list[str] = []
     for line in block:
         stripped = line.strip()
         if stripped.startswith("|") and stripped.endswith("|"):
-            rows.append(_split_row(stripped, unescape_pipes))
-            in_table = True
-        elif in_table:
-            break  # table ended
+            current.append(stripped)
+        elif current:
+            runs.append(current)
+            current = []
+    if current:
+        runs.append(current)
+    return runs
+
+
+def _build_table(lines: list[str], unescape_pipes: bool) -> dict | None:
+    rows = [_split_row(line, unescape_pipes) for line in lines]
     if len(rows) < 2:
         return None
     header = rows[0]
