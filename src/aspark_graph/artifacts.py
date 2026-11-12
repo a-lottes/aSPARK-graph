@@ -281,18 +281,16 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    table = _first_table(section, unescape_pipes=True)
-    if table is None:
-        return 0
-    header = {k.lower() for k in table["header"]}
-    id_col = _qa_id_column(table["header"])
-    if id_col is None:
-        raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
-    if not any("result" in h for h in header):
-        raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
+    # Per-story reports split the section into one table per story: read all of
+    # them, with one running row index so single-table ids stay unchanged.
+    tables = _tables(section, unescape_pipes=True)
+    for table in tables:
+        _check_qa_header(path, table)
+    rows = [(table, row) for table in tables for row in table["rows"]]
 
     added = 0
-    for index, row in enumerate(table["rows"]):
+    for index, (table, row) in enumerate(rows):
+        id_col = _qa_id_column(table["header"])
         ac_cell = _col(row, id_col)
         m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
         if not m:
@@ -309,6 +307,14 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
             graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
         added += 1
     return added
+
+
+def _check_qa_header(path: Path, table: dict) -> None:
+    header = {k.lower() for k in table["header"]}
+    if _qa_id_column(table["header"]) is None:
+        raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
+    if not any("result" in h for h in header):
+        raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
 
 
 def _qa_id_column(header: list[str]) -> str | None:
@@ -382,6 +388,34 @@ def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
         cells = raw + [""] * (len(header) - len(raw))
         data.append({header[i].lower(): cells[i] for i in range(len(header))})
     return {"header": header, "rows": data}
+
+
+def _tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
+    """Every markdown pipe-table in ``block``, in document order, shaped like
+    ``_first_table``. A pipe block without a separator row is skipped."""
+    runs: list[list[str]] = []
+    current: list[str] | None = None
+    for line in block:
+        stripped = line.strip()
+        if stripped.startswith("|") and stripped.endswith("|"):
+            if current is None:
+                current = []
+                runs.append(current)
+            current.append(stripped)
+        else:
+            current = None
+    tables = []
+    for run in runs:
+        rows = [_split_row(r, unescape_pipes) for r in run]
+        if len(rows) < 2 or not all(set(c) <= set("-: ") for c in rows[1]):
+            continue
+        header = rows[0]
+        data = []
+        for raw in rows[2:]:
+            cells = raw + [""] * (len(header) - len(raw))
+            data.append({header[i].lower(): cells[i] for i in range(len(header))})
+        tables.append({"header": header, "rows": data})
+    return tables
 
 
 def _split_row(line: str, unescape_pipes: bool = False) -> list[str]:

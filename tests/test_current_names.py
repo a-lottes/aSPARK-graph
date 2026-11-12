@@ -10,7 +10,7 @@ import pytest
 from aspark_graph import queries
 from aspark_graph.artifacts import TemplateDriftError, _normalise_result, _split_row
 from aspark_graph.build import build_graph
-from aspark_graph.model import ac_id, feature_id, file_id, finding_id
+from aspark_graph.model import NodeType, ac_id, feature_id, file_id, finding_id
 
 CURRENT_REPO = Path(__file__).parent / "fixtures" / "current_names_repo"
 
@@ -337,3 +337,78 @@ def test_c14_default_split_still_separates_on_every_pipe():
     # scope guard: review/plan tables keep their current splitting (AC-5.1)
     assert _split_row("| a | b\\|c | d |") == ["a", "b\\", "c", "d"]
     assert _split_row("| a | b\\|c | d |", True) == ["a", "b|c", "d"]
+
+
+# --- qa-multi-table: per-story tables in one verification section -------------
+
+_SPLIT_QA = """# QA Report: demo
+
+| **Status** | `passed` |
+
+## 2. Acceptance Criteria Verification
+
+### US-1
+
+| Spec ID | Steps performed | Result |
+|---|---|---|
+| AC-1.1 | call main | ✅ pass |
+| AC-1.2 | inspect run | ✅ pass |
+
+### US-2
+
+| AC | Steps performed | Result |
+|---|---|---|
+| AC-2.1 | trigger secondary | ✅ pass |
+| NFR-1 | build twice | ✅ pass |
+
+## 5. Verdict
+
+Fine.
+"""
+
+
+def _split_repo(tmp_path, text=_SPLIT_QA) -> Path:
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(text)
+    return repo
+
+
+def test_per_story_tables_are_all_read(tmp_path):
+    graph, _ = build_graph(_split_repo(tmp_path))
+    assert queries.gate_health(graph, "demo")["unverified_acs"] == []
+    trace = queries.story_trace(graph, "US-2", feature="demo")
+    ac = next(a for a in trace["acceptance_criteria"] if a["ac"] == "AC-2.1")
+    assert ac["latest_result"] == "pass"
+    checks = sorted((d["order"], d["ac"]) for d in graph.nodes(NodeType.QA_CHECK))
+    assert [o for o, _ in checks] == [0, 1, 2]
+
+
+def test_per_story_tables_build_is_byte_identical(tmp_path):
+    g1, _ = build_graph(_split_repo(tmp_path / "a"))
+    g2, _ = build_graph(_split_repo(tmp_path / "b"))
+    assert _graph_bytes(g1, tmp_path, "r1") == _graph_bytes(g2, tmp_path, "r2")
+
+
+@pytest.mark.parametrize("old,new,needle", [
+    ("| AC | Steps performed | Result |", "| ID | Steps performed | Result |", "'AC' or 'Spec ID'"),
+    ("| AC | Steps performed | Result |", "| AC | Steps performed | Verdict |", "'Result'"),
+])
+def test_malformed_later_table_is_drift(tmp_path, old, new, needle):
+    repo = _split_repo(tmp_path, _SPLIT_QA.replace(old, new))
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert exc.value.file.endswith("qa.md")
+    assert needle in exc.value.mismatch
+
+
+def test_table_outside_verification_section_is_ignored(tmp_path):
+    base, _ = build_graph(_split_repo(tmp_path / "a"))
+    extra = _SPLIT_QA.replace("Fine.", "| AC | Result |\n|---|---|\n| AC-9.9 | ✅ pass |\n")
+    more, _ = build_graph(_split_repo(tmp_path / "b", extra))
+    assert len(base.nodes(NodeType.QA_CHECK)) == len(more.nodes(NodeType.QA_CHECK)) == 3
+
+
+def test_section_without_table_yields_no_checks(tmp_path):
+    text = _SPLIT_QA.split("### US-1")[0] + "No tables here.\n\n## 5. Verdict\n\nFine.\n"
+    graph, _ = build_graph(_split_repo(tmp_path, text))
+    assert graph.nodes(NodeType.QA_CHECK) == []
