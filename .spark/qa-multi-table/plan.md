@@ -63,3 +63,4 @@ Approved (autonomous line, gate pre-approved by the caller).
 ## Deviations
 
 - T4: stash round-trip compared this repo and `current_names_repo`. The fixture is byte-identical; this repo differs only by `artifacts.py` symbol/line entries (the code itself changed), no QA/story/AC nodes.
+- T2 (review F1/F6/F7, accepted at `/peer-review` r3): for tables after the first, the id column must be an exact `AC` or `Spec ID` header cell (`artifacts.py:297-298`), not `_qa_id_column`'s v0.7.0 `ac…` prefix rule. A later table with only a loose header (`Action`, `Actual`, `AC ID` …) is skipped as notes; a later exact-header table without a Result column still raises drift. The first table keeps the prefix rule unchanged. Known limit: a later verification table headed with a loose id such as `AC ID` is skipped silently (an undercount, never a wrong verdict). The corpus has none: 89 tables across Core, this repo and `/opt/aspark` all use the exact headers.
