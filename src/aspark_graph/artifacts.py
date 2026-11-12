@@ -281,33 +281,41 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    table = _first_table(section, unescape_pipes=True)
-    if table is None:
+    tables = _all_tables(section, unescape_pipes=True)
+    if not tables:
         return 0
-    header = {k.lower() for k in table["header"]}
-    id_col = _qa_id_column(table["header"])
-    if id_col is None:
-        raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
-    if not any("result" in h for h in header):
-        raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
 
     added = 0
-    for index, row in enumerate(table["rows"]):
-        ac_cell = _col(row, id_col)
-        m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
-        if not m:
-            continue
-        ac = m.group(1)
-        result = _normalise_result(_col(row, "result"))
-        node_id = qacheck_id(feature, ac, index)
-        graph.add_node(
-            node_id, NodeType.QA_CHECK,
-            ac=ac, result=result, date=_col(row, "date"), feature=feature, order=index,
-        )
-        target = ac_id(feature, ac)
-        if graph.has_node(target):
-            graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
-        added += 1
+    index = 0  # running row index across all tables keeps QA_CHECK ids unique
+    for n, table in enumerate(tables):
+        header = {k.lower() for k in table["header"]}
+        id_col = _qa_id_column(table["header"])
+        has_result = any("result" in h for h in header)
+        if n == 0:
+            if id_col is None:
+                raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
+            if not has_result:
+                raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
+        elif id_col is None or not has_result:
+            continue  # a later non-verification table (e.g. a summary) is not drift
+        for row in table["rows"]:
+            ac_cell = _col(row, id_col)
+            m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
+            if not m:
+                index += 1
+                continue
+            ac = m.group(1)
+            result = _normalise_result(_col(row, "result"))
+            node_id = qacheck_id(feature, ac, index)
+            graph.add_node(
+                node_id, NodeType.QA_CHECK,
+                ac=ac, result=result, date=_col(row, "date"), feature=feature, order=index,
+            )
+            target = ac_id(feature, ac)
+            if graph.has_node(target):
+                graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
+            added += 1
+            index += 1
     return added
 
 
@@ -357,6 +365,22 @@ def _section(lines: list[str], keyword: str) -> list[str] | None:
             end = j
             break
     return lines[start:end]
+
+
+def _all_tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
+    """Every markdown pipe-table in ``block``, in order (tables split by blank/heading lines)."""
+    tables: list[dict] = []
+    chunk: list[str] = []
+    for line in block + [""]:
+        stripped = line.strip()
+        if stripped.startswith("|") and stripped.endswith("|"):
+            chunk.append(line)
+        elif chunk:
+            t = _first_table(chunk, unescape_pipes)
+            if t is not None:
+                tables.append(t)
+            chunk = []
+    return tables
 
 
 def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
