@@ -1,0 +1,79 @@
+"""qa-multi-table: every table in the QA verification section is read (issue #72)."""
+import shutil
+from pathlib import Path
+
+import pytest
+
+from aspark_graph import queries
+from aspark_graph.artifacts import TemplateDriftError, _first_table, _tables
+from aspark_graph.build import build_graph
+from aspark_graph.model import NodeType, ac_id
+
+CURRENT_REPO = Path(__file__).parent / "fixtures" / "current_names_repo"
+
+HEAD = "# QA Report: demo\n\n| **Status** | `passed` |\n\n## 2. Acceptance Criteria Verification\n\n"
+T1 = "### US-1\n\n| Spec ID | Result |\n|---|---|\n| AC-1.1 | ✅ pass |\n| AC-1.2 | ✅ pass |\n\n"
+T2 = "### US-2\n\n| Spec ID | Result |\n|---|---|\n| AC-2.1 | ❌ fail |\n\n"
+
+
+def _repo(tmp_path, body) -> Path:
+    dest = tmp_path / "repo"
+    shutil.copytree(CURRENT_REPO, dest, ignore=shutil.ignore_patterns(".aspark-graph"))
+    (dest / ".spark" / "demo" / "qa.md").write_text(HEAD + body)
+    return dest
+
+
+def _checks(graph):
+    return sorted(graph.nodes(NodeType.QA_CHECK), key=lambda n: n["order"])
+
+
+def test_tables_yields_every_run_and_none_for_malformed():
+    block = ["| a | b |", "|---|---|", "| 1 | 2 |", "", "| x | y |", "| 3 | 4 |", "", "| h |", "|---|", "| v |"]
+    tables = list(_tables(block))
+    assert [t is None for t in tables] == [False, True, False]
+    assert _first_table(["| x | y |", "| 3 | 4 |", "", "| h |", "|---|", "| v |"]) is None
+
+
+def test_every_table_row_becomes_a_check_with_unique_ordered_ids(tmp_path):
+    graph, _ = build_graph(_repo(tmp_path, T1 + T2))
+    checks = _checks(graph)
+    assert [c["ac"] for c in checks] == ["AC-1.1", "AC-1.2", "AC-2.1"]
+    assert [c["order"] for c in checks] == [0, 1, 2]
+    assert len({c["id"] for c in checks}) == 3
+    for c in checks:
+        assert graph.out_edges(c["id"])  # verifies edge to its AC
+
+
+def test_ac_in_two_tables_keeps_both_checks_in_order(tmp_path):
+    t = "### US-3\n\n| Spec ID | Result |\n|---|---|\n| AC-1.1 | ❌ fail |\n\n"
+    graph, _ = build_graph(_repo(tmp_path, T1 + t))
+    checks = [c for c in _checks(graph) if c["ac"] == "AC-1.1"]
+    assert [c["result"] for c in checks] == ["pass", "fail"]
+
+
+def test_later_table_verdicts_reach_queries(tmp_path):
+    graph, _ = build_graph(_repo(tmp_path, T1 + T2))
+    unverified = {a["id"] for a in queries.gate_health(graph, "demo")["unverified_acs"]}
+    assert ac_id("demo", "AC-1.2") not in unverified
+    assert ac_id("demo", "AC-2.1") in unverified  # fail verdict, not a pass
+    trace = queries.story_trace(graph, "US-2", feature="demo")
+    assert "fail" in str(trace)
+
+
+def test_notes_table_without_id_column_is_skipped(tmp_path):
+    notes = "| Item | Note |\n|---|---|\n| a | b |\n\n"
+    graph, _ = build_graph(_repo(tmp_path, T1 + notes + T2))
+    assert [c["ac"] for c in _checks(graph)] == ["AC-1.1", "AC-1.2", "AC-2.1"]
+
+
+def test_later_table_with_id_but_no_result_is_drift(tmp_path):
+    bad = "| Spec ID | Notes |\n|---|---|\n| AC-2.1 | x |\n"
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(_repo(tmp_path, T1 + bad))
+    assert exc.value.file.endswith("qa.md")
+    assert "Result" in exc.value.mismatch
+
+
+def test_first_table_without_result_is_still_drift(tmp_path):
+    with pytest.raises(TemplateDriftError):
+        build_graph(_repo(tmp_path, "| Spec ID | Notes |\n|---|---|\n| AC-1.1 | x |\n"))
