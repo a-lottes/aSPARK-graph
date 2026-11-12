@@ -97,7 +97,7 @@ unchanged repo produce byte-identical ids and a byte-identical `graph.json`.
 | Layer | Types | Source |
 |---|---|---|
 | Code | `File`, `Class`, `Function` | tree-sitter extraction |
-| Artifact | `Feature`, `Story`, `AcceptanceCriterion`, `Task`, `Finding`, `QACheck` | `.spark/` templates |
+| Artifact | `Feature`, `Release`, `Story`, `AcceptanceCriterion`, `Task`, `Finding`, `QACheck` | `.spark/` templates |
 
 **Edge types**
 
@@ -109,6 +109,7 @@ unchanged repo produce byte-identical ids and a byte-identical `graph.json`.
 | `has_story` | Feature → Story | artifact structure |
 | `has_ac` | Story → AcceptanceCriterion | " |
 | `has_task` | Feature → Task | " |
+| `released_as` | Feature → Release | the release file's `Version` (`declared`); `commit` is set only when a git tag named exactly the version exists |
 | `maps_to` | Task → Story | plan links a task to the story it serves |
 | `implements` | Task → File/Function | **the code↔story bridge** (best-effort; see below) |
 | `verifies` | QACheck → AcceptanceCriterion | QA result for an AC |

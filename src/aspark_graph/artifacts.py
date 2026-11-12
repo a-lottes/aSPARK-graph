@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from . import git
 from .graph import Graph
 from .model import (
     Confidence,
@@ -25,6 +26,7 @@ from .model import (
     file_id,
     finding_id,
     qacheck_id,
+    release_id,
     story_id,
     task_id,
 )
@@ -126,6 +128,7 @@ def _parse_feature(feature_dir: Path, graph: Graph, shadowed: list[str] | None =
     if release is not None:
         statuses["release"] = _status(release)
         version = _release_version(release)
+        added += _add_release(release, feature, fid, version, statuses["release"], feature_dir.parent.parent, graph)
 
     # Coverage statement (issue #61): a verdict is only honest over the files
     # that actually parsed. Record what was seen, what was skipped, and what
@@ -340,6 +343,30 @@ def _status(path: Path) -> str | None:
 def _release_version(path: Path) -> str | None:
     m = re.search(r"\|\s*\*\*Version\*\*\s*\|\s*([^|]+?)\s*\|", _read(path))
     return _strip_ticks(m.group(1)) if m else None
+
+
+_VERSION_TOKEN_RE = re.compile(r"^\S+")
+_ISO_DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+
+
+def _add_release(path: Path, feature: str, fid: str, version: str | None,
+                 status: str | None, repo_root: Path, graph: Graph) -> int:
+    """Release node + ``released_as`` edge, only when the file carries a Version."""
+    m = _VERSION_TOKEN_RE.match(version or "")
+    if not m:
+        return 0
+    token = m.group(0).strip("`")
+    if not token:
+        return 0
+    dm = re.search(r"\|\s*\*\*Date\*\*\s*\|\s*([^|]*?)\s*\|", _read(path))
+    dated = _ISO_DATE_RE.search(dm.group(1)) if dm else None
+    rid = release_id(feature, token)
+    graph.add_node(
+        rid, NodeType.RELEASE, feature=feature, version=token, status=status,
+        date=dated.group(1) if dated else None, commit=git.tag_commit(repo_root, token),
+    )
+    graph.add_edge(fid, rid, EdgeType.RELEASED_AS, Confidence.DECLARED)
+    return 1
 
 
 def _section(lines: list[str], keyword: str) -> list[str] | None:

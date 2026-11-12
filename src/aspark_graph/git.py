@@ -40,6 +40,17 @@ def is_git_repo(root: str | Path) -> bool:
     return code == 0 and out.strip() == "true"
 
 
+def tag_commit(root: str | Path, tag: str) -> str | None:
+    """Full SHA of the commit the tag named exactly ``tag`` points to, else None.
+
+    Never raises, never guesses: no git, no such tag, or an odd name -> None."""
+    if not tag or tag.startswith("-") or not is_git_repo(root):
+        return None
+    code, out = _run(root, ["rev-parse", "--verify", "--quiet", f"refs/tags/{tag}^{{commit}}"])
+    sha = out.strip()
+    return sha if code == 0 and _SHA_RE.match(sha) else None
+
+
 _SHA_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
 
