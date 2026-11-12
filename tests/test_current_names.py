@@ -337,3 +337,37 @@ def test_c14_default_split_still_separates_on_every_pipe():
     # scope guard: review/plan tables keep their current splitting (AC-5.1)
     assert _split_row("| a | b\\|c | d |") == ["a", "b\\", "c", "d"]
     assert _split_row("| a | b\\|c | d |", True) == ["a", "b|c", "d"]
+
+
+# --- multi-table QA verification (BACKLOG G6) --------------------------------
+
+_QA_HEAD = "# QA Report: demo\n\n| **Status** | `passed` |\n\n## 2. Acceptance Criteria Verification\n\n"
+
+
+def test_g6_every_table_of_the_verification_section_is_read(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        _QA_HEAD
+        + "### US-1\n\n| Spec ID | Result |\n|---|---|\n| AC-1.1 | ✅ pass |\n\n"
+        + "### US-2\n\n| Spec ID | Result |\n|---|---|\n| AC-1.2 | ✅ pass |\n\n"
+        + "### US-2b\n\n| Spec ID | Result |\n|---|---|\n| AC-2.1 | ✅ pass |\n\n"
+        + "## 3. Other\n\n| Spec ID | Result |\n|---|---|\n| AC-9.9 | ✅ pass |\n"
+    )
+    graph, _ = build_graph(repo)
+    checks = [n for n in graph.nodes() if n["type"] == "QACheck"]
+    assert sorted(n["ac"] for n in checks) == ["AC-1.1", "AC-1.2", "AC-2.1"]
+    assert len({n["id"] for n in checks}) == 3
+    assert queries.gate_health(graph, "demo")["unverified_acs"] == []
+
+
+def test_g6_later_table_without_result_column_is_drift(tmp_path):
+    repo = _copy_repo(tmp_path)
+    (repo / ".spark" / "demo" / "qa.md").write_text(
+        _QA_HEAD
+        + "| Spec ID | Result |\n|---|---|\n| AC-1.1 | ✅ pass |\n\n"
+        + "### US-2\n\n| Spec ID | Notes |\n|---|---|\n| AC-1.2 | x |\n"
+    )
+    with pytest.raises(TemplateDriftError) as exc:
+        build_graph(repo)
+    assert exc.value.file.endswith("qa.md")
+    assert "'Result'" in exc.value.mismatch

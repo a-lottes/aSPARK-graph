@@ -237,7 +237,7 @@ zurück. Gegenseite ist Item C3 im aSPARK-Repo — nicht ohne sie releasen.
 
 ### G6 · `qa-multi-table` — alle Tabellen der QA-Verifikation lesen
 
-**Priorität: Nach v0.7.1. Aufgenommen am 2026-09-24 (Plan-Gate von `current-artifact-names`, Q1).**
+**Status: erledigt (alle Tabellen der Verifikationssektion werden gelesen).** **Priorität: Nach v0.7.1. Aufgenommen am 2026-09-24 (Plan-Gate von `current-artifact-names`, Q1).**
 
 `_parse_qa` liest nur die **erste** Tabelle unter `## … Acceptance Criteria Verification`
 (`_first_table`). 4 von 13 `qa.md` in Core teilen die Sektion in `### US-n`-Teiltabellen
