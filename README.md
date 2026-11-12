@@ -201,6 +201,7 @@ JSON.
 aspark-graph query story_trace US-2 --feature my-feature
 aspark-graph query impact src/foo.py src/bar.py
 aspark-graph query impact --diff HEAD~1..HEAD      # blast radius of a change range
+aspark-graph query impact --diff HEAD~1..HEAD --brief --feature my-feature   # bounded answer for an agent
 
 # Gate & freshness
 aspark-graph query gate_health my-feature          # are this feature's ACs covered / passing?
@@ -212,6 +213,19 @@ aspark-graph query find_nodes Widget --type Class
 aspark-graph query get_neighbors "story:my-feature:US-1" --edge-type has_ac
 aspark-graph query shortest_path "task:my-feature:T1" "ac:my-feature:AC-1.1"
 ```
+
+**`--brief` — the answer an agent can read in one go.** The full `impact` answer
+lists every code entity, story and AC per file; on a grown repo that is tens of
+kilobytes, past what an agent's tool result holds. `--brief` (MCP: `brief=true`)
+returns the same hits regrouped: one entry per story, grouped by feature, with the
+story's confidence, its ACs by confidence tier and the changed files that reach it
+(`via`). Files carry counts, not lists. With `--feature <name>` the stories of
+*other* features come first under `other_features` and the named feature's own under
+`this_feature` — the first list is what a change breaks unnoticed. The answer is
+bounded (30 stories, 20 ACs and 5 `via` paths per story); when a bound cuts,
+`truncated` is `true`, `acs_total`/`via_total` name the full counts, `totals` always
+counts everything, and the own feature is cut before the others. Without `--brief`
+the answer is unchanged.
 
 ### MCP
 

@@ -68,18 +68,29 @@ def story_trace(story: str, feature: str | None = None, repo: str = ".") -> dict
 
 
 @mcp.tool()
-def impact(files: list[str] | None = None, diff: str | None = None, repo: str = ".") -> dict:
+def impact(
+    files: list[str] | None = None,
+    diff: str | None = None,
+    repo: str = ".",
+    brief: bool = False,
+    feature: str | None = None,
+) -> dict:
     """Blast radius of a change: the stories and acceptance criteria that depend
     on the given files (or the files in a git `diff` range), each tagged with its
-    weakest-edge confidence. Pass either `files` or `diff`, not both."""
+    weakest-edge confidence. Pass either `files` or `diff`, not both.
+
+    Prefer `brief=true`: a bounded answer with the stories grouped by feature, their
+    acceptance criteria and the files that reach them, without entity lists. With
+    `feature` set to the feature you are working on, the stories of other features
+    come first (`other_features`) — the ones a change breaks unnoticed."""
     graph, err = _open(repo)
     if err:
         return err
     if diff:
         if files:
             return {"found": False, "reason": "bad_args", "message": "pass either files or diff, not both"}
-        return queries.impact_diff(graph, repo, diff)
-    return queries.impact(graph, files or [])
+        return queries.impact_diff(graph, repo, diff, brief=brief, feature=feature)
+    return queries.impact(graph, files or [], brief=brief, feature=feature)
 
 
 @mcp.tool()
