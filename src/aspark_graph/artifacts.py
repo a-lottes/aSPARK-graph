@@ -281,18 +281,31 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    table = _first_table(section, unescape_pipes=True)
-    if table is None:
+    tables = _all_tables(section, unescape_pipes=True)
+    if not tables:
         return 0
-    header = {k.lower() for k in table["header"]}
-    id_col = _qa_id_column(table["header"])
-    if id_col is None:
-        raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
-    if not any("result" in h for h in header):
-        raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
-
+    # Some qa.md files split the section into one table per story; read them all.
+    # The first table is validated strictly; later ones lacking an id column are
+    # not verification tables and are skipped.
     added = 0
-    for index, row in enumerate(table["rows"]):
+    index = -1
+    for n, table in enumerate(tables):
+        header = {k.lower() for k in table["header"]}
+        id_col = _qa_id_column(table["header"])
+        if id_col is None:
+            if n == 0:
+                raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
+            continue
+        if not any("result" in h for h in header):
+            raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
+        added += _qa_rows(table, id_col, feature, graph, index_start=index + 1)
+        index += len(table["rows"])
+    return added
+
+
+def _qa_rows(table: dict, id_col: str, feature: str, graph: Graph, index_start: int) -> int:
+    added = 0
+    for index, row in enumerate(table["rows"], start=index_start):
         ac_cell = _col(row, id_col)
         m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
         if not m:
@@ -361,15 +374,27 @@ def _section(lines: list[str], keyword: str) -> list[str] | None:
 
 def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
     """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}."""
-    rows: list[list[str]] = []
-    in_table = False
+    tables = _all_tables(block, unescape_pipes)
+    return tables[0] if tables else None
+
+
+def _all_tables(block: list[str], unescape_pipes: bool = False) -> list[dict]:
+    """Every markdown pipe-table in ``block``, in document order."""
+    groups: list[list[list[str]]] = []
+    current: list[list[str]] | None = None
     for line in block:
         stripped = line.strip()
         if stripped.startswith("|") and stripped.endswith("|"):
-            rows.append(_split_row(stripped, unescape_pipes))
-            in_table = True
-        elif in_table:
-            break  # table ended
+            if current is None:
+                current = []
+                groups.append(current)
+            current.append(_split_row(stripped, unescape_pipes))
+        else:
+            current = None
+    return [t for t in (_table_from_rows(g) for g in groups) if t is not None]
+
+
+def _table_from_rows(rows: list[list[str]]) -> dict | None:
     if len(rows) < 2:
         return None
     header = rows[0]
