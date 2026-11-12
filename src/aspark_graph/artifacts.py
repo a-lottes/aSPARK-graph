@@ -281,33 +281,41 @@ def _parse_qa(path: Path, feature: str, graph: Graph) -> int:
     section = _section(lines, "acceptance criteria verification")
     if section is None:
         raise TemplateDriftError(str(path), "missing a '## … Acceptance Criteria Verification' section")
-    table = _first_table(section, unescape_pipes=True)
-    if table is None:
-        return 0
-    header = {k.lower() for k in table["header"]}
-    id_col = _qa_id_column(table["header"])
-    if id_col is None:
-        raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
-    if not any("result" in h for h in header):
-        raise TemplateDriftError(str(path), f"QA table missing a 'Result' column (found {sorted(header)})")
-
     added = 0
-    for index, row in enumerate(table["rows"]):
-        ac_cell = _col(row, id_col)
-        m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
-        if not m:
+    offset = 0
+    first = True
+    for position, table in enumerate(_tables(section, unescape_pipes=True), start=1):
+        if table is None:
             continue
-        ac = m.group(1)
-        result = _normalise_result(_col(row, "result"))
-        node_id = qacheck_id(feature, ac, index)
-        graph.add_node(
-            node_id, NodeType.QA_CHECK,
-            ac=ac, result=result, date=_col(row, "date"), feature=feature, order=index,
-        )
-        target = ac_id(feature, ac)
-        if graph.has_node(target):
-            graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
-        added += 1
+        is_first, first = first, False
+        header = {k.lower() for k in table["header"]}
+        id_col = _qa_id_column(table["header"])
+        if id_col is None:
+            if is_first:
+                raise TemplateDriftError(str(path), f"QA table missing an 'AC' or 'Spec ID' column (found {sorted(header)})")
+            continue  # a later table without an id column is a notes table
+        if not is_first and not any(h.strip().lower() == id_col for h in table["header"]):
+            continue  # loose "ac…" header (e.g. "Action"): a notes table
+        if not any("result" in h for h in header):
+            where = "" if is_first else f" (table {position})"
+            raise TemplateDriftError(str(path), f"QA table{where} missing a 'Result' column (found {sorted(header)})")
+        for index, row in enumerate(table["rows"], start=offset):
+            ac_cell = _col(row, id_col)
+            m = re.search(r"(AC-\d+\.\d+)", ac_cell or "")
+            if not m:
+                continue
+            ac = m.group(1)
+            result = _normalise_result(_col(row, "result"))
+            node_id = qacheck_id(feature, ac, index)
+            graph.add_node(
+                node_id, NodeType.QA_CHECK,
+                ac=ac, result=result, date=_col(row, "date"), feature=feature, order=index,
+            )
+            target = ac_id(feature, ac)
+            if graph.has_node(target):
+                graph.add_edge(node_id, target, EdgeType.VERIFIES, Confidence.DECLARED)
+            added += 1
+        offset += len(table["rows"])
     return added
 
 
@@ -361,15 +369,25 @@ def _section(lines: list[str], keyword: str) -> list[str] | None:
 
 def _first_table(block: list[str], unescape_pipes: bool = False) -> dict | None:
     """First markdown pipe-table in ``block`` as {header: [...], rows: [{col: val}]}."""
-    rows: list[list[str]] = []
-    in_table = False
+    return next(_tables(block, unescape_pipes), None)
+
+
+def _tables(block: list[str], unescape_pipes: bool = False):
+    """One entry per run of contiguous pipe lines in ``block``: the parsed
+    {header, rows} dict, or None when the run is not a real table."""
+    run: list[list[str]] = []
     for line in block:
         stripped = line.strip()
         if stripped.startswith("|") and stripped.endswith("|"):
-            rows.append(_split_row(stripped, unescape_pipes))
-            in_table = True
-        elif in_table:
-            break  # table ended
+            run.append(_split_row(stripped, unescape_pipes))
+        elif run:
+            yield _table_from_rows(run)
+            run = []
+    if run:
+        yield _table_from_rows(run)
+
+
+def _table_from_rows(rows: list[list[str]]) -> dict | None:
     if len(rows) < 2:
         return None
     header = rows[0]
