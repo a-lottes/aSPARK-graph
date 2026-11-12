@@ -1,5 +1,7 @@
 """T5: artifact parser + the crown-jewel drift-failure test (AC-1.3)."""
 
+import json
+
 import pytest
 
 from aspark_graph.artifacts import TemplateDriftError, _normalise_result, extract_features
@@ -136,7 +138,7 @@ def _qa_repo(tmp_path, qa_body, name="qa.md"):
     feature.mkdir(parents=True)
     (feature / "spec.md").write_text(
         "# Spec: multi\n\n| **Status** | approved |\n\n## 4. User Stories\n\n"
-        "### US-1 (Must): a\n\n- [ ] AC-1.1: x\n"
+        "### US-1 (Must): a\n\n- [ ] AC-1.1: x\n- [ ] AC-1.2: x\n- [ ] AC-2.1: x\n- [ ] AC-3.1: x\n- [ ] AC-3.2: x\n"
     )
     (feature / name).write_text(
         "# QA\n\n| **Status** | passed |\n\n## 3. Acceptance Criteria Verification\n\n" + qa_body
@@ -166,6 +168,7 @@ def test_qa_reads_all_tables_with_running_index(tmp_path):
     assert [n["ac"] for n in nodes] == ["AC-1.1", "AC-1.2", "AC-2.1", "AC-3.1", "AC-3.2"]
     assert [n["order"] for n in nodes] == [0, 1, 3, 4, 5]  # NFR row consumed index 2
     assert [n["result"] for n in nodes] == ["pass", "pass", "unknown", "fail", "pass"]
+    assert [n["date"] for n in nodes] == ["d"] * 5  # escaped \| in table 3 keeps its column (AC-1.6)
 
 
 def test_qa_no_table_is_zero(tmp_path):
@@ -196,3 +199,29 @@ def test_qa_multi_table_double_build_identical(tmp_path):
         assert cli.main(["build", str(repo), "--full"]) == 0
         outs.append((repo / ".aspark-graph" / "graph.json").read_bytes())
     assert outs[0] == outs[1]
+
+
+def test_qa_multi_table_gate_health_sees_later_tables(tmp_path):
+    from aspark_graph import queries
+    repo = _qa_repo(tmp_path, _MULTI)
+    g = Graph()
+    extract_features(repo, g)
+    health = queries.gate_health(g, "multi")
+    unverified = json.dumps(health.get("unverified_acs"))
+    for passed in ("AC-1.1", "AC-1.2", "AC-3.2"):
+        assert passed not in unverified
+    assert len(g.edges()) and any(e["type"] == "verifies" for e in g.edges())
+
+
+@pytest.mark.parametrize("name", ["qa.md", "qa-report.md"])
+def test_qa_later_table_drift_clean_in_cli_and_mcp(tmp_path, capsys, name):
+    from aspark_graph import cli, server
+    bad = "| Thing | Result |\n|---|---|\n| x | ✅ |\n"
+    repo = _qa_repo(tmp_path, _HDR + "| AC-1.1 | ✅ | d |\n\n### US-2\n\n" + bad, name)
+    (repo / ".git").mkdir()
+    assert cli.main(["build", str(repo)]) == 1
+    err = capsys.readouterr().err
+    assert len(err.strip().splitlines()) == 1 and "Traceback" not in err
+    with pytest.raises(TemplateDriftError) as exc:
+        server.build_graph(str(repo))
+    assert str(exc.value) in err
