@@ -7,7 +7,7 @@
 | **Phase** | Review (hands-on) |
 | **Owner** | QA Tester (`/demo-day`) |
 | **Input** | CLI (`aspark-graph build` / `query gate_health`), `.spark/qa-multi-table/spec.md` |
-| **Status** | `passed` |
+| **Status** | `in-review` |
 | **Round** | 1 |
 | **Date** | 2026-11-12 |
 
