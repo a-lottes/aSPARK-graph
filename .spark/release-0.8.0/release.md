@@ -11,7 +11,7 @@
 | **Version** | v0.8.0 (minor: a sixth language and a new optional `brief` form of `impact`; no breaking change) |
 | **Date** | 2026-11-13 |
 | **Commit** | release commit on `claude/project-thread-6tuvqo`, on top of `ab437e8` (PR #49); tag `v0.8.0` on the merge commit after the merge |
-| **PR** | see `.spark/releases.md` |
+| **PR** | https://github.com/a-lottes/aSPARK-graph/pull/76 |
 
 **Handoff**
 - **Status:** mirrors the header table above (authoritative for `Status` and `Version`).
