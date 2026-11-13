@@ -5,7 +5,7 @@ Guidance for AI agents working in this repo. Part of the aSPARK product family.
 ## What this is
 
 A lean, local **code-and-artifact knowledge graph** served over MCP + a CLI. It
-links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust) with its `.spark/`
+links a repo's code (tree-sitter: Python, TypeScript/JavaScript, Java, Go, Rust, C#) with its `.spark/`
 delivery artifacts, so agents can ask `story_trace` ("which code implements this
 story, and did its ACs pass QA?") and `impact` ("what's the blast radius of
 changing these files?"). Deterministic and offline; the **persisted graph**
@@ -48,7 +48,11 @@ loses links; non-shallow graph.json byte-identical to v0.7.1; known limits: git
 v0.7.3 is a direct hotfix without a `.spark/` trail (user's call): caps `pydantic<2.14`,
 because pydantic 2.14 broke `serve` in every fresh install of 0.7.1/0.7.2 (found by the
 v0.7.2 post-release smoke check; see `.spark/shallow-clone-warning/release.md` §3).
-**Current shipped version: 0.7.3.** Read the relevant trail before changing
+`csharp-support/` (v0.8.0 — C# extractor: `File`/`Class`/`Function` nodes, `using`
+directives resolve to in-repo namespaces, best-effort; six languages supported) and
+`impact --brief` (v0.8.0, issue #46, no trail of its own) ship together; the bundle
+record is `.spark/release-0.8.0/release.md`.
+**Current shipped version: 0.8.0.** Read the relevant trail before changing
 behaviour.
 
 ## Layout & the one load-bearing convention
@@ -78,7 +82,7 @@ each adapter. Never compute an answer in an adapter.
 
 - **Determinism (AC-1.2).** The graph must rebuild byte-for-byte on an unchanged
   repo. Persistence is canonical (sorted nodes/edges, `sort_keys`). Parse-
-  affecting deps (the five tree-sitter grammars + core) are pinned `==`;
+  affecting deps (the six tree-sitter grammars + core) are pinned `==`;
   `uv.lock` covers the rest. There is a byte-identical double-build test — keep it.
 - **Fail loudly on template drift (AC-1.3).** `artifacts.py` is pinned to a
   supported template shape and raises `TemplateDriftError` naming the file + the
